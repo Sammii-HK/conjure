@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String?
+  emailVerified Boolean       @default(false)
+  image         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  prompts       Prompt[]
+  collections   Collection[]
+  sessions_     PromptSession[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                    String  @id @default(cuid())
+  userId                String
+  user                  User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([providerId, accountId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model PromptSession {
+  id          String            @id @default(cuid())
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brief       String
+  account     String?
+  platform    String            @default("midjourney")
+  orientation String            @default("portrait")
+  iterations  PromptIteration[]
+  createdAt   DateTime          @default(now())
+}
+
+model PromptIteration {
+  id         String          @id @default(cuid())
+  sessionId  String
+  session    PromptSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  refinement String?
+  prompts    Prompt[]
+  createdAt  DateTime        @default(now())
+}
+
+model Prompt {
+  id           String          @id @default(cuid())
+  iterationId  String
+  iteration    PromptIteration @relation(fields: [iterationId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label        String
+  output       String
+  rating       Int?
+  favourite    Boolean         @default(false)
+  saved        Boolean         @default(false)
+  tags         String[]
+  collectionId String?
+  collection   Collection?     @relation(fields: [collectionId], references: [id])
+  createdAt    DateTime        @default(now())
+}
+
+model Collection {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  account   String?
+  prompts   Prompt[]
+  createdAt DateTime @default(now())
+}

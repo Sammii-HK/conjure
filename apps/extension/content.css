@@ -1,0 +1,10 @@
+/* Prevent Midjourney styles from bleeding into Conjure UI */
+#conjure-panel {
+  all: initial;
+  position: fixed !important;
+}
+
+#conjure-toggle {
+  all: initial;
+  position: fixed !important;
+}

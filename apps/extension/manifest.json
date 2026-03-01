@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Conjure — AI Prompt Builder",
+  "version": "1.0.0",
+  "description": "AI-powered prompt builder for Midjourney, FLUX, and DALL·E. Inject perfect prompts directly into the Midjourney UI.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://www.midjourney.com/*",
+    "http://localhost:3000/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.midjourney.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["panel.html", "assets/*"],
+      "matches": ["https://www.midjourney.com/*"]
+    }
+  ]
+}
