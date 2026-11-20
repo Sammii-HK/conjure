@@ -13,12 +13,12 @@ A personal image-prompt studio. Turn a brief into three directions, refine one, 
 
 ## Development and checks
 
-Node 24 and pnpm 9.15 are used for the local verification. Install locked dependencies, then run `pnpm test`, `pnpm test:icons`, `pnpm lint` and `pnpm type-check`. `pnpm build` checks icons and builds both apps. Local Prisma client generation is code generation only; database operations require an explicitly confirmed target.
+Node 24 and pnpm 9.15 are used for the local verification. Install locked dependencies, then run `pnpm test`, `pnpm test:icons`, `pnpm test:auth-compat`, `pnpm lint` and `pnpm type-check`. `pnpm build` checks icons and builds both apps. Local Prisma client generation is code generation only; database operations require an explicitly confirmed target.
 
 The web service uses Next.js 15, React 19, Tailwind, Lucide, Prisma/PostgreSQL, Better Auth and Groq through the Vercel AI SDK. Generation needs a configured provider; without it, the studio gives an unavailable message while browser saves remain usable. Account operations additionally require a configured authentication service and database. Configuration values belong in the deployment's secret management, not committed files.
 
 Build the extension with `pnpm --filter @conjure/extension build`. Its verified unpacked output is `apps/extension/dist`; loading it in Chrome grants its declared permissions and should be reviewed separately. The production service address is explicit in `apps/extension/config.ts` and its host permission must match.
 
-See [the dated product review](docs/quality/product-review-20261120.md) for tested paths and integration limitations.
+See [the dependency review](docs/quality/dependency-review-20261120.md) for residual breaking-upgrade findings. See [the dated product review](docs/quality/product-review-20261120.md) for tested paths and integration limitations.
 
 Built by [Sammii](https://github.com/sammii-hk).
