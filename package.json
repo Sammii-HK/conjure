@@ -2,11 +2,14 @@
   "name": "conjure",
   "private": true,
   "scripts": {
-    "build": "turbo build",
+    "build": "pnpm lint:icons && pnpm test:icons && turbo build",
     "dev": "turbo dev",
-    "lint": "turbo lint",
+    "lint": "pnpm lint:icons && pnpm test:icons && turbo lint",
     "type-check": "turbo type-check",
-    "clean": "turbo clean"
+    "clean": "turbo clean",
+    "lint:icons": "node site-quality/lint-icons.mjs --root apps",
+    "test:icons": "node --test site-quality/icons.test.mjs",
+    "test": "node --test tests/*.test.ts"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

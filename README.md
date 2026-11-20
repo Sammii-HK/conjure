@@ -1,106 +1,24 @@
 # Conjure
 
-AI-powered prompt builder for Midjourney, FLUX, and DALL·E. Generate three prompt variations (safe, creative, experimental) from a plain-English brief, refine them iteratively, and save your favourites to a personal library.
+A personal image-prompt studio. Turn a brief into three directions, refine one, then copy the text into Midjourney, FLUX or DALL·E. Conjure generates prompt text, not images.
 
-Built as a personal tool for my own image generation workflow.
+## Current behaviour
 
-![Next.js](https://img.shields.io/badge/Next.js_15-black?style=flat-square&logo=next.js)
-![Turborepo](https://img.shields.io/badge/Turborepo-EF4444?style=flat-square&logo=turborepo&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
-![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white)
+- Three directions: straightforward, creative and experimental. These are interpretations, not guarantees of image quality.
+- Style profiles and portrait/square/landscape composition. Midjourney receives `--ar`; model/version settings stay yours. Set FLUX and DALL·E dimensions in their own tools.
+- Refinement keeps the original brief and settings. Remix includes the saved text as a reference.
+- Save, rate, favourite, search and remix on this browser. Browser saves are not backed up or account-synced; clearing browser storage removes them.
+- Existing authenticated account APIs use user-owned sessions, iterations and saved records. No sign-in interface or collections management interface is currently supplied.
+- Chrome MV3 side panel targets `https://www.midjourney.com`. It calls the production Conjure service for prompt text and can place text into a recognised prompt field without submitting it. Copy is the fallback. Panel drafts are temporary and do not sync with the web library.
 
-## Features
+## Development and checks
 
-- **Prompt generation** — describe what you want in plain English, get 3 variations tuned for safe/creative/experimental outputs
-- **Multi-platform** — Midjourney (v6.1), FLUX.1, and DALL·E 3 with correct parameter formatting per platform
-- **Account style context** — style hints per social persona (e.g. ethereal lifestyle, witchy illustration, cosmic astrology)
-- **Orientation control** — portrait, square, or landscape with correct `--ar` params appended automatically
-- **Iterative refinement** — refine any prompt with a follow-up instruction, keeping session context
-- **Library** — save, rate, and favourite prompts; organise into collections
-- **Chrome extension** — inject the prompt builder into any page (Midjourney Discord, etc.)
+Node 24 and pnpm 9.15 are used for the local verification. Install locked dependencies, then run `pnpm test`, `pnpm test:icons`, `pnpm lint` and `pnpm type-check`. `pnpm build` checks icons and builds both apps. Local Prisma client generation is code generation only; database operations require an explicitly confirmed target.
 
-## Stack
+The web service uses Next.js 15, React 19, Tailwind, Lucide, Prisma/PostgreSQL, Better Auth and Groq through the Vercel AI SDK. Generation needs a configured provider; without it, the studio gives an unavailable message while browser saves remain usable. Account operations additionally require a configured authentication service and database. Configuration values belong in the deployment's secret management, not committed files.
 
-| Layer | Tech |
-|---|---|
-| Framework | Next.js 15 (App Router) |
-| Monorepo | Turborepo + pnpm workspaces |
-| AI | Groq API (Llama 3.3 70B) via Vercel AI SDK |
-| Database | Prisma 6 + PostgreSQL (Neon) |
-| Auth | better-auth 1.2.5 |
-| Styling | Tailwind CSS |
-| Extension | Chrome MV3, Vite + React |
+Build the extension with `pnpm --filter @conjure/extension build`. Its verified unpacked output is `apps/extension/dist`; loading it in Chrome grants its declared permissions and should be reviewed separately. The production service address is explicit in `apps/extension/config.ts` and its host permission must match.
 
-## Project structure
+See [the dated product review](docs/quality/product-review-20261120.md) for tested paths and integration limitations.
 
-```
-conjure/
-├── apps/
-│   ├── web/          # Next.js app
-│   └── extension/    # Chrome MV3 extension
-├── package.json
-├── pnpm-workspace.yaml
-└── turbo.json
-```
-
-## Getting started
-
-### Prerequisites
-
-- Node.js 20+
-- pnpm
-- PostgreSQL database (Neon recommended)
-- Groq API key (free tier at console.groq.com)
-
-### Setup
-
-```bash
-# Install dependencies
-pnpm install
-
-# Generate Prisma client
-cd apps/web && npx prisma generate
-
-# Copy and fill in env vars
-cp apps/web/.env.example apps/web/.env
-```
-
-### Environment variables
-
-```env
-DATABASE_URL=
-GROQ_API_KEY=
-NEXT_PUBLIC_APP_URL=
-BETTER_AUTH_SECRET=
-BETTER_AUTH_URL=
-EXTENSION_API_KEY=
-```
-
-### Database
-
-```bash
-cd apps/web
-npx prisma migrate dev
-```
-
-### Run
-
-```bash
-pnpm dev
-```
-
-### Build Chrome extension
-
-```bash
-cd apps/extension
-pnpm build
-# Load apps/extension/dist as an unpacked extension in Chrome
-```
-
-## Deployment
-
-Deployed on Vercel. Set root directory to `apps/web` in Vercel project settings, and add all env vars from above.
-
----
-
-Built by [Sammii](https://github.com/sammii-hk)
+Built by [Sammii](https://github.com/sammii-hk).

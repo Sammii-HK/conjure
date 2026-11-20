@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "prisma generate && next build",
+    "build": "node ../../site-quality/lint-icons.mjs --root . && prisma generate && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "node ../../site-quality/lint-icons.mjs --root . && next lint",
     "type-check": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

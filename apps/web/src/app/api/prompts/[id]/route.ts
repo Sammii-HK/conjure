@@ -1,19 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { libraryHandlers } from "@/lib/account-library";
 export const dynamic = "force-dynamic";
-import { prisma } from "@/lib/prisma";
-
 export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  try {
-    const { id } = await params;
-
-    await prisma.prompt.delete({ where: { id } });
-
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("[prompt DELETE] error:", err);
-    return NextResponse.json({ error: "Failed to delete prompt" }, { status: 500 });
-  }
+  return libraryHandlers.remove(request, (await params).id);
+}
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  return libraryHandlers.change(request, (await params).id, "favourite");
 }

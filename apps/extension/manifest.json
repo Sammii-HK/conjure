@@ -1,16 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Conjure — AI Prompt Builder",
+  "name": "Conjure: prompt studio",
   "version": "1.0.0",
-  "description": "AI-powered prompt builder for Midjourney, FLUX, and DALL·E. Inject perfect prompts directly into the Midjourney UI.",
-  "permissions": [
-    "storage",
-    "activeTab"
-  ],
-  "host_permissions": [
-    "https://www.midjourney.com/*",
-    "http://localhost:3000/*"
-  ],
+  "description": "Draft and refine image prompts. Copy into your image tool or place text into the Midjourney prompt field.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://conjure-two.vercel.app/*"],
   "content_scripts": [
     {
       "matches": ["https://www.midjourney.com/*"],
@@ -20,21 +14,11 @@
     }
   ],
   "action": {
-    "default_popup": "popup.html",
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    }
-  },
-  "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
+    "default_popup": "popup.html"
   },
   "web_accessible_resources": [
     {
-      "resources": ["panel.html", "assets/*"],
+      "resources": ["panel/index.html", "panel.js", "assets/*"],
       "matches": ["https://www.midjourney.com/*"]
     }
   ]

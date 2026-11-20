@@ -1,5 +1,4 @@
 "use client";
-
 import { useState } from "react";
 import {
   Copy,
@@ -7,243 +6,229 @@ import {
   Bookmark,
   BookmarkCheck,
   RefreshCw,
-  ChevronDown,
-  ChevronUp,
+  Loader2,
   ThumbsUp,
   ThumbsDown,
-  Loader2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import type { PromptLabel, PromptVariation } from "@/types";
-
-interface PromptCardProps {
-  variation: PromptVariation;
-  sessionId: string | null;
-  iterationId: string | null;
-  refinementText: string;
-  isRefining: boolean;
-  onRefinementChange: (text: string) => void;
-  onRefine: () => void;
-  savedId?: string;
-  initialRating?: number | null;
-}
-
-const LABEL_VARIANT: Record<PromptLabel, "safe" | "creative" | "experimental"> = {
-  safe: "safe",
-  creative: "creative",
-  experimental: "experimental",
-};
-
+import { saveVariation, rateSaved } from "@/lib/library-client";
+import type { PromptContext } from "@/lib/local-library";
+import type { PromptVariation, SavedPrompt } from "@/types";
 export function PromptCard({
   variation,
   sessionId,
   iterationId,
+  context,
+  storage,
   refinementText,
   isRefining,
+  disabled,
   onRefinementChange,
   onRefine,
-  savedId: initialSavedId,
-  initialRating,
-}: PromptCardProps) {
-  const [copied, setCopied] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [savedId, setSavedId] = useState<string | undefined>(initialSavedId);
-  const [showRefine, setShowRefine] = useState(false);
-  const [rating, setRating] = useState<number | null>(initialRating ?? null);
-  const [ratingLoading, setRatingLoading] = useState(false);
-
-  async function handleCopy() {
-    await navigator.clipboard.writeText(variation.prompt);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  async function handleSave() {
-    if (savedId || !iterationId) return;
-    setSaving(true);
+}: {
+  variation: PromptVariation;
+  sessionId: string | null;
+  iterationId: string | null;
+  context: PromptContext;
+  storage: "browser" | "account";
+  refinementText: string;
+  isRefining: boolean;
+  disabled: boolean;
+  onRefinementChange: (text: string) => void;
+  onRefine: () => void;
+}) {
+  const [saved, setSaved] = useState<SavedPrompt | null>(null),
+    [pending, setPending] = useState(false),
+    [copied, setCopied] = useState(false),
+    [notice, setNotice] = useState(""),
+    [error, setError] = useState(""),
+    [showRefine, setShowRefine] = useState(false);
+  async function copy() {
+    setError("");
     try {
-      const res = await fetch("/api/prompts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          iterationId,
-          label: variation.label,
-          output: variation.prompt,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSavedId(data.id);
-      }
+      await navigator.clipboard.writeText(variation.prompt);
+      setCopied(true);
+      setNotice("Prompt copied.");
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setError(
+        "Copy is unavailable. Select the prompt text and copy it manually.",
+      );
+    }
+  }
+  async function save(rating?: number | null) {
+    if (!iterationId || pending) return;
+    setPending(true);
+    setError("");
+    try {
+      let prompt =
+        saved ??
+        (await saveVariation({ storage, iterationId, variation, context }));
+      setSaved(prompt);
+      if (rating !== undefined) prompt = await rateSaved(prompt, rating);
+      setSaved(prompt);
+      setNotice(
+        storage === "browser"
+          ? "Saved on this browser."
+          : "Saved to your account library.",
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Your prompt could not be saved. Copy it to keep it elsewhere.",
+      );
     } finally {
-      setSaving(false);
+      setPending(false);
     }
   }
-
-  async function handleRate(value: number) {
-    const newRating = rating === value ? null : value;
-    setRatingLoading(true);
-
-    const targetId = savedId;
-    if (!targetId) {
-      // Auto-save first, then rate
-      try {
-        if (iterationId) {
-          const res = await fetch("/api/prompts", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              iterationId,
-              label: variation.label,
-              output: variation.prompt,
-            }),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setSavedId(data.id);
-            await ratePrompt(data.id, newRating);
-          }
-        }
-      } finally {
-        setRatingLoading(false);
-      }
-      return;
-    }
-
-    await ratePrompt(targetId, newRating);
-    setRatingLoading(false);
-  }
-
-  async function ratePrompt(id: string, value: number | null) {
-    const res = await fetch(`/api/prompts/${id}/rate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rating: value }),
-    });
-    if (res.ok) setRating(value);
-  }
-
+  const title = {
+    safe: "A clear starting point",
+    creative: "An artistic interpretation",
+    experimental: "A bolder departure",
+  }[variation.label];
+  const action =
+    "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-border hover:text-text disabled:opacity-40";
   return (
-    <div className="group rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5">
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <Badge variant={LABEL_VARIANT[variation.label as PromptLabel] ?? "default"}>
-          {variation.label}
-        </Badge>
-        <div className="flex items-center gap-1">
-          {/* Rating */}
+    <article className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <Badge variant={variation.label}>
+            {variation.label === "safe" ? "Straightforward" : variation.label}
+          </Badge>
+          <h3 className="mt-2 text-sm font-medium">{title}</h3>
+        </div>
+        <div
+          className="flex flex-wrap gap-1"
+          role="group"
+          aria-label={`${variation.label} prompt actions`}
+        >
           <button
-            onClick={() => handleRate(1)}
-            disabled={ratingLoading}
-            className={`p-1.5 rounded-lg transition-colors ${
-              rating === 1
-                ? "text-emerald-400 bg-emerald-900/30"
-                : "text-text-muted hover:text-emerald-400 hover:bg-emerald-900/20"
-            }`}
-            title="Good prompt"
+            type="button"
+            className={action}
+            aria-label="Like this prompt"
+            aria-pressed={saved?.rating === 1}
+            disabled={pending}
+            onClick={() => void save(saved?.rating === 1 ? null : 1)}
           >
-            <ThumbsUp className="h-3.5 w-3.5" />
+            <ThumbsUp size={16} aria-hidden />
           </button>
           <button
-            onClick={() => handleRate(-1)}
-            disabled={ratingLoading}
-            className={`p-1.5 rounded-lg transition-colors ${
-              rating === -1
-                ? "text-red-400 bg-red-900/30"
-                : "text-text-muted hover:text-red-400 hover:bg-red-900/20"
-            }`}
-            title="Not great"
+            type="button"
+            className={action}
+            aria-label="Dislike this prompt"
+            aria-pressed={saved?.rating === -1}
+            disabled={pending}
+            onClick={() => void save(saved?.rating === -1 ? null : -1)}
           >
-            <ThumbsDown className="h-3.5 w-3.5" />
+            <ThumbsDown size={16} aria-hidden />
           </button>
-
-          {/* Save */}
           <button
-            onClick={handleSave}
-            disabled={saving || !!savedId}
-            className={`p-1.5 rounded-lg transition-colors ${
-              savedId
-                ? "text-accent"
-                : "text-text-muted hover:text-accent hover:bg-accent/10"
-            }`}
-            title={savedId ? "Saved to library" : "Save to library"}
+            type="button"
+            className={action}
+            aria-label={saved ? "Prompt saved" : "Save prompt"}
+            disabled={pending || !!saved || !iterationId}
+            onClick={() => void save()}
           >
-            {saving ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : savedId ? (
-              <BookmarkCheck className="h-3.5 w-3.5" />
+            {pending ? (
+              <Loader2
+                size={16}
+                className="animate-spin motion-reduce:animate-none"
+                aria-hidden
+              />
+            ) : saved ? (
+              <BookmarkCheck size={16} aria-hidden />
             ) : (
-              <Bookmark className="h-3.5 w-3.5" />
+              <Bookmark size={16} aria-hidden />
             )}
           </button>
-
-          {/* Copy */}
           <button
-            onClick={handleCopy}
-            className={`p-1.5 rounded-lg transition-colors ${
-              copied
-                ? "text-emerald-400 bg-emerald-900/30"
-                : "text-text-muted hover:text-text hover:bg-border"
-            }`}
-            title="Copy to clipboard"
+            type="button"
+            className={action}
+            aria-label="Copy prompt"
+            onClick={() => void copy()}
           >
             {copied ? (
-              <Check className="h-3.5 w-3.5" />
+              <Check size={16} aria-hidden />
             ) : (
-              <Copy className="h-3.5 w-3.5" />
+              <Copy size={16} aria-hidden />
             )}
           </button>
         </div>
       </div>
-
-      <p className="text-sm text-text leading-relaxed font-mono whitespace-pre-wrap break-words">
+      <p className="break-words whitespace-pre-wrap font-mono text-sm leading-relaxed text-text">
         {variation.prompt}
       </p>
-
-      {/* Refine toggle */}
+      <p role="status" className="mt-3 min-h-4 text-xs text-text-muted">
+        {notice ||
+          `Save ${storage === "browser" ? "on this browser" : "to your account"}, or copy into your image tool.`}
+      </p>
+      {error && (
+        <p role="alert" className="mt-2 text-xs text-red-300">
+          {error}
+        </p>
+      )}
       {sessionId && (
-        <div className="mt-3 border-t border-border/50 pt-3">
+        <div className="mt-4 border-t border-border pt-3">
           <button
+            type="button"
+            disabled={disabled}
+            aria-expanded={showRefine}
+            className="inline-flex min-h-11 items-center gap-2 text-sm text-text-muted hover:text-text"
             onClick={() => setShowRefine(!showRefine)}
-            className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text transition-colors"
           >
-            <RefreshCw className="h-3 w-3" />
-            Refine this prompt
+            <RefreshCw size={14} aria-hidden />
+            Refine this direction
             {showRefine ? (
-              <ChevronUp className="h-3 w-3" />
+              <ChevronUp size={14} aria-hidden />
             ) : (
-              <ChevronDown className="h-3 w-3" />
+              <ChevronDown size={14} aria-hidden />
             )}
           </button>
-
           {showRefine && (
-            <div className="mt-2 flex gap-2">
-              <input
-                type="text"
-                value={refinementText}
-                onChange={(e) => onRefinementChange(e.target.value)}
-                placeholder="more dreamy, warmer tones, from behind..."
-                className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-text placeholder:text-text-muted/50 focus:border-accent/50 focus:outline-none transition-colors"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onRefine();
-                }}
-              />
+            <div className="space-y-3">
+              <label className="block space-y-2 text-xs text-text-muted">
+                What should change?
+                <input
+                  value={refinementText}
+                  maxLength={1000}
+                  disabled={disabled}
+                  onChange={(event) => onRefinementChange(event.target.value)}
+                  placeholder="Warmer light, a wider composition…"
+                  className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-text"
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" &&
+                      !disabled &&
+                      refinementText.trim()
+                    )
+                      onRefine();
+                  }}
+                />
+              </label>
               <Button
-                onClick={onRefine}
-                disabled={isRefining || !refinementText.trim()}
-                size="sm"
                 variant="secondary"
+                disabled={disabled || !refinementText.trim()}
+                onClick={onRefine}
               >
                 {isRefining ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <Loader2
+                    size={14}
+                    className="animate-spin motion-reduce:animate-none"
+                    aria-hidden
+                  />
                 ) : (
-                  "Refine"
+                  <RefreshCw size={14} aria-hidden />
                 )}
+                Refine direction
               </Button>
             </div>
           )}
         </div>
       )}
-    </div>
+    </article>
   );
 }

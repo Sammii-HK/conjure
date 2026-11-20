@@ -6,12 +6,11 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: "dist",
-    emptyOutDir: true,
+    emptyOutDir: false,
     rollupOptions: {
       input: {
         panel: resolve(__dirname, "panel/index.html"),
         popup: resolve(__dirname, "popup.html"),
-        content: resolve(__dirname, "content.ts"),
       },
       output: {
         entryFileNames: "[name].js",

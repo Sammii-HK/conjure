@@ -1,36 +1,20 @@
-import Link from "next/link";
-import { Wand2, ArrowLeft } from "lucide-react";
 import { Library } from "@/components/Library";
-
 export default function LibraryPage() {
   return (
-    <div className="min-h-screen" style={{ background: "#0a0a0f" }}>
-      {/* Header */}
-      <header className="border-b border-border/50">
-        <div className="mx-auto max-w-3xl px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Wand2 className="h-5 w-5 text-accent" />
-            <span className="font-semibold text-text">Conjure</span>
-          </div>
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-sm text-text-muted hover:text-text transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Builder
-          </Link>
-        </div>
+    <main id="main" className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
+      <header className="mb-8">
+        <p className="text-xs uppercase tracking-[.22em] text-violet-300">
+          Your prompt library
+        </p>
+        <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">
+          Worth another look.
+        </h1>
+        <p className="mt-4 max-w-xl text-base leading-relaxed text-text-muted">
+          The prompts you kept, ready to copy, compare and take in a different
+          direction.
+        </p>
       </header>
-
-      {/* Main */}
-      <main className="mx-auto max-w-3xl px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-text mb-1">Library</h1>
-          <p className="text-text-muted text-sm">Your saved prompts, organised and ready to remix.</p>
-        </div>
-
-        <Library />
-      </main>
-    </div>
+      <Library />
+    </main>
   );
 }

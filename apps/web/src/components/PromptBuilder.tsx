@@ -1,261 +1,323 @@
 "use client";
-
-import { useState } from "react";
-import { Wand2, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowUpRight, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { PromptCard } from "@/components/PromptCard";
 import type {
   Account,
   GenerateRequest,
+  GenerateResponse,
   Orientation,
   Platform,
-  PromptVariation,
 } from "@/types";
-
-const ACCOUNTS: { value: Account | ""; label: string }[] = [
-  { value: "", label: "No account" },
-  { value: "sammiisparkle", label: "sammiisparkle" },
-  { value: "spellbound", label: "spellbound" },
-  { value: "lunary", label: "lunary" },
-  { value: "personal", label: "personal" },
+import type { PromptContext } from "@/lib/local-library";
+const ACCOUNTS: [Account | "", string][] = [
+  ["", "No style profile"],
+  ["sammiisparkle", "Sammii Sparkle"],
+  ["spellbound", "Spellbound"],
+  ["lunary", "Lunary"],
+  ["personal", "Personal"],
 ];
-
-const PLATFORMS: { value: Platform; label: string }[] = [
-  { value: "midjourney", label: "Midjourney" },
-  { value: "flux", label: "FLUX" },
-  { value: "dalle", label: "DALL·E" },
-];
-
-const ORIENTATIONS: { value: Orientation; label: string }[] = [
-  { value: "portrait", label: "Portrait 9:16" },
-  { value: "square", label: "Square 1:1" },
-  { value: "landscape", label: "Landscape 16:9" },
-];
-
-interface PromptBuilderProps {
+export function PromptBuilder({
+  initialBrief = "",
+  initialPrompt = "",
+}: {
   initialBrief?: string;
   initialPrompt?: string;
-}
-
-export function PromptBuilder({ initialBrief = "", initialPrompt = "" }: PromptBuilderProps) {
-  const [brief, setBrief] = useState(initialBrief);
-  const [account, setAccount] = useState<Account | "">("");
-  const [platform, setPlatform] = useState<Platform>("midjourney");
-  const [orientation, setOrientation] = useState<Orientation>("portrait");
-  const [loading, setLoading] = useState(false);
-  const [variations, setVariations] = useState<PromptVariation[]>([]);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [iterationId, setIterationId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Refinement state per card
-  const [refining, setRefining] = useState<Record<number, boolean>>({});
-  const [refinementText, setRefinementText] = useState<Record<number, string>>({});
-
-  async function handleGenerate() {
-    if (!brief.trim()) return;
-    setLoading(true);
-    setError(null);
-
+}) {
+  const [brief, setBrief] = useState(initialBrief),
+    [account, setAccount] = useState<Account | "">(""),
+    [platform, setPlatform] = useState<Platform>("midjourney"),
+    [orientation, setOrientation] = useState<Orientation>("portrait");
+  const [result, setResult] = useState<GenerateResponse | null>(null),
+    [context, setContext] = useState<PromptContext | null>(null),
+    [error, setError] = useState("");
+  const [busy, setBusy] = useState(false),
+    [refining, setRefining] = useState<number | null>(null),
+    [instructions, setInstructions] = useState<Record<number, string>>({});
+  const request = useRef<AbortController | null>(null);
+  useEffect(() => () => request.current?.abort(), []);
+  async function generate(index?: number) {
+    if (request.current) return;
+    const isRefine = index !== undefined;
+    if (isRefine && (!result || !context || !instructions[index!]?.trim()))
+      return;
+    const nextContext: PromptContext = isRefine
+      ? { ...context!, refinement: instructions[index!].trim() }
+      : {
+          brief: brief.trim(),
+          account: account || null,
+          platform,
+          orientation,
+          refinement: null,
+        };
+    if (!nextContext.brief) return;
+    const controller = new AbortController();
+    request.current = controller;
+    setBusy(true);
+    setRefining(index ?? null);
+    setError("");
     const body: GenerateRequest = {
-      brief,
-      account,
-      platform,
-      orientation,
-      ...(initialPrompt ? { basePrompt: initialPrompt } : {}),
+      brief: nextContext.brief,
+      account: (nextContext.account || "") as Account | "",
+      platform: nextContext.platform as Platform,
+      orientation: nextContext.orientation as Orientation,
+      ...(isRefine
+        ? {
+            sessionId: result!.sessionId,
+            basePrompt: result!.variations[index!].prompt,
+            refinement: nextContext.refinement!,
+          }
+        : initialPrompt
+          ? { basePrompt: initialPrompt }
+          : {}),
     };
-
     try {
-      const res = await fetch("/api/generate", {
+      const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Generation failed");
-      }
-
-      const data = await res.json();
-      setVariations(data.variations);
-      setSessionId(data.sessionId);
-      setIterationId(data.iterationId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(
+          data.error || "Your request could not finish. Try again.",
+        );
+      if (
+        !Array.isArray(data.variations) ||
+        data.variations.length !== 3 ||
+        !data.iterationId
+      )
+        throw new Error("The response was incomplete. Try again.");
+      setResult({
+        ...data,
+        storage: data.storage === "account" ? "account" : "browser",
+      });
+      setContext(nextContext);
+      setInstructions({});
+    } catch (cause) {
+      if (!controller.signal.aborted)
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "Your request could not finish. Try again.",
+        );
     } finally {
-      setLoading(false);
+      if (request.current === controller) {
+        request.current = null;
+        setBusy(false);
+        setRefining(null);
+      }
     }
   }
-
-  async function handleRefine(index: number, basePrompt: string) {
-    const refinement = refinementText[index];
-    if (!refinement?.trim() || !sessionId) return;
-
-    setRefining((prev) => ({ ...prev, [index]: true }));
-
-    const body: GenerateRequest = {
-      brief,
-      account,
-      platform,
-      orientation,
-      sessionId,
-      refinement,
-      basePrompt,
-    };
-
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) throw new Error("Refinement failed");
-
-      const data = await res.json();
-      setVariations(data.variations);
-      setIterationId(data.iterationId);
-      setRefinementText((prev) => ({ ...prev, [index]: "" }));
-      setRefining((prev) => ({ ...prev, [index]: false }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-      setRefining((prev) => ({ ...prev, [index]: false }));
-    }
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Builder form */}
-      <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-text-muted mb-1.5">
-            What do you want to create?
-          </label>
-          <textarea
-            value={brief}
-            onChange={(e) => setBrief(e.target.value)}
-            placeholder="A mystical forest at dusk with glowing mushrooms and fireflies, seen through the eyes of a wandering fox..."
-            rows={4}
-            className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-text placeholder:text-text-muted/50 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30 resize-none transition-colors"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleGenerate();
-            }}
-          />
-          {initialPrompt && (
-            <p className="mt-1.5 text-xs text-text-muted">
-              Remixing saved prompt as base
+    <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.12fr)]">
+      <section
+        aria-labelledby="brief-heading"
+        className="rounded-2xl border border-border bg-card p-5 sm:p-7 lg:sticky lg:top-6"
+      >
+        <div className="mb-6 flex items-center gap-3">
+          <span className="rounded-xl bg-accent/15 p-2.5 text-violet-300">
+            <Wand2 size={20} aria-hidden />
+          </span>
+          <div>
+            <p className="text-xs uppercase tracking-[.2em] text-text-muted">
+              Start with an idea
             </p>
-          )}
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-text-muted mb-1.5 uppercase tracking-wider">
-              Account
-            </label>
-            <select
-              value={account}
-              onChange={(e) => setAccount(e.target.value as Account | "")}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text focus:border-accent/50 focus:outline-none transition-colors"
-            >
-              {ACCOUNTS.map((a) => (
-                <option key={a.value} value={a.value}>
-                  {a.label}
-                </option>
-              ))}
-            </select>
+            <h2 id="brief-heading" className="mt-1 text-lg font-semibold">
+              Your image brief
+            </h2>
           </div>
-
-          <div>
-            <label className="block text-xs font-medium text-text-muted mb-1.5 uppercase tracking-wider">
-              Platform
-            </label>
+        </div>
+        <label htmlFor="brief" className="mb-2 block text-sm text-text-muted">
+          What do you want to make?
+        </label>
+        <textarea
+          id="brief"
+          maxLength={2000}
+          value={brief}
+          onChange={(event) => setBrief(event.target.value)}
+          rows={7}
+          placeholder="The subject, the atmosphere, a detail you don’t want to lose…"
+          className="w-full resize-y rounded-xl border border-border bg-background px-4 py-3 text-sm leading-relaxed text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault();
+              void generate();
+            }
+          }}
+        />
+        <div className="mt-2 flex justify-between gap-3 text-xs text-text-muted">
+          <span>Be visual. What should someone see?</span>
+          <span>{brief.length}/2000</span>
+        </div>
+        {initialPrompt && (
+          <div className="mt-4 rounded-lg border border-violet-500/25 bg-accent/10 p-3 text-xs leading-relaxed text-violet-200">
+            Remixing a saved prompt. Its text is included as a reference; it is
+            not discarded when you generate.
+          </div>
+        )}
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <label className="space-y-2 text-xs text-text-muted">
+            Image tool
             <select
+              aria-label="Image tool"
               value={platform}
-              onChange={(e) => setPlatform(e.target.value as Platform)}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text focus:border-accent/50 focus:outline-none transition-colors"
+              onChange={(event) => setPlatform(event.target.value as Platform)}
+              className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-text"
             >
-              {PLATFORMS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
+              {[
+                ["midjourney", "Midjourney"],
+                ["flux", "FLUX"],
+                ["dalle", "DALL·E"],
+              ].map(([value, label]) => (
+                <option value={value} key={value}>
+                  {label}
                 </option>
               ))}
             </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-text-muted mb-1.5 uppercase tracking-wider">
-              Orientation
-            </label>
+          </label>
+          <label className="space-y-2 text-xs text-text-muted">
+            Composition
             <select
+              aria-label="Composition"
               value={orientation}
-              onChange={(e) => setOrientation(e.target.value as Orientation)}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text focus:border-accent/50 focus:outline-none transition-colors"
+              onChange={(event) =>
+                setOrientation(event.target.value as Orientation)
+              }
+              className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-text"
             >
-              {ORIENTATIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
+              {[
+                ["portrait", "Portrait / 9:16"],
+                ["square", "Square / 1:1"],
+                ["landscape", "Landscape / 16:9"],
+              ].map(([value, label]) => (
+                <option value={value} key={value}>
+                  {label}
                 </option>
               ))}
             </select>
-          </div>
+          </label>
+          <label className="space-y-2 text-xs text-text-muted sm:col-span-2">
+            Style profile
+            <select
+              aria-label="Style profile"
+              value={account}
+              onChange={(event) =>
+                setAccount(event.target.value as Account | "")
+              }
+              className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-text"
+            >
+              {ACCOUNTS.map(([value, label]) => (
+                <option value={value} key={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
-
-        <Button
-          onClick={handleGenerate}
-          disabled={loading || !brief.trim()}
-          size="lg"
-          className="w-full"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Conjuring...
-            </>
-          ) : (
-            <>
-              <Wand2 className="h-4 w-4" />
-              Conjure
-            </>
-          )}
-        </Button>
-
-        <p className="text-center text-xs text-text-muted/50">
-          Press Cmd+Enter to generate
+        <p className="mt-3 text-xs leading-relaxed text-text-muted">
+          {platform === "midjourney"
+            ? "Adds your aspect ratio. Your Midjourney model and styling settings stay yours."
+            : "Creates prompt text. Set matching image dimensions in your image tool."}
         </p>
-      </div>
-
-      {error && (
-        <div className="rounded-xl border border-red-800/50 bg-red-900/20 px-4 py-3 text-sm text-red-400">
-          {error}
+        <Button
+          className="mt-6 w-full"
+          size="lg"
+          disabled={busy || !brief.trim()}
+          onClick={() => void generate()}
+        >
+          {busy ? (
+            <Loader2
+              size={18}
+              className="animate-spin motion-reduce:animate-none"
+              aria-hidden
+            />
+          ) : (
+            <Sparkles size={18} aria-hidden />
+          )}
+          {busy
+            ? refining !== null
+              ? "Refining your direction…"
+              : "Writing three directions…"
+            : "Create three directions"}
+        </Button>
+        <p className="mt-3 text-center text-xs text-text-muted">
+          Cmd or Ctrl + Enter
+        </p>
+      </section>
+      <section aria-labelledby="results-heading" className="min-w-0 space-y-5">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[.2em] text-text-muted">
+              Explore the possibilities
+            </p>
+            <h2 id="results-heading" className="mt-2 text-xl font-semibold">
+              Three directions. Your judgement.
+            </h2>
+          </div>
+          <span className="text-xs text-text-muted">
+            {result ? "Ready to review" : "Not generated yet"}
+          </span>
         </div>
-      )}
-
-      {/* Results */}
-      {variations.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-sm font-medium text-text-muted uppercase tracking-wider">
-            Generated variations
-          </h2>
-          <div className="grid gap-4">
-            {variations.map((v, i) => (
+        {error && (
+          <p
+            role="alert"
+            className="rounded-xl border border-red-700/40 bg-red-950/30 p-4 text-sm text-red-200"
+          >
+            {error}
+          </p>
+        )}
+        {result && context ? (
+          <>
+            <p className="text-xs leading-relaxed text-text-muted">
+              {result.storage === "browser"
+                ? "Save and rate on this browser. These prompts are not synced to an account."
+                : "Save and rate in your account library."}{" "}
+              Refining keeps the brief and settings used for these results.
+            </p>
+            {result.variations.map((variation, index) => (
               <PromptCard
-                key={`${iterationId}-${i}`}
-                variation={v}
-                sessionId={sessionId}
-                iterationId={iterationId}
-                refinementText={refinementText[i] ?? ""}
-                isRefining={refining[i] ?? false}
+                key={`${result.iterationId}:${variation.label}`}
+                variation={variation}
+                sessionId={result.sessionId}
+                iterationId={result.iterationId}
+                context={context}
+                storage={result.storage}
+                refinementText={instructions[index] ?? ""}
+                isRefining={refining === index}
+                disabled={busy}
                 onRefinementChange={(text) =>
-                  setRefinementText((prev) => ({ ...prev, [i]: text }))
+                  setInstructions((previous) => ({
+                    ...previous,
+                    [index]: text,
+                  }))
                 }
-                onRefine={() => handleRefine(i, v.prompt)}
+                onRefine={() => void generate(index)}
               />
             ))}
+          </>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border bg-card/50 px-6 py-10 sm:px-8">
+            <p className="max-w-sm text-lg leading-relaxed text-text">
+              A straightforward take, an artistic interpretation and a bolder
+              departure.
+            </p>
+            <p className="mt-4 max-w-md text-sm leading-relaxed text-text-muted">
+              Write a brief to see the differences. Keep a direction, refine it
+              or copy it into your image tool. Conjure writes prompts; it does
+              not generate images here.
+            </p>
+            <a
+              href="/library"
+              className="mt-7 inline-flex min-h-11 items-center gap-2 text-sm text-violet-300"
+            >
+              Visit your library <ArrowUpRight size={16} aria-hidden />
+            </a>
           </div>
-        </div>
-      )}
+        )}
+      </section>
     </div>
   );
 }

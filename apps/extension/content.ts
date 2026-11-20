@@ -1,144 +1,91 @@
-// Content script — injected into midjourney.com
-// Injects a collapsible Conjure side panel
-
-const PANEL_ID = "conjure-panel";
-const TOGGLE_ID = "conjure-toggle";
-
-function createToggleButton(): HTMLButtonElement {
-  const btn = document.createElement("button");
-  btn.id = TOGGLE_ID;
-  btn.setAttribute("aria-label", "Toggle Conjure panel");
-  btn.style.cssText = `
-    position: fixed;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 999999;
-    background: #7c3aed;
-    color: white;
-    border: none;
-    border-radius: 8px 0 0 8px;
-    padding: 12px 8px;
-    cursor: pointer;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    line-height: 1;
-    box-shadow: -2px 0 12px rgba(124, 58, 237, 0.4);
-    transition: background 150ms ease;
-  `;
-  btn.textContent = "CONJURE";
-
-  btn.addEventListener("mouseenter", () => {
-    btn.style.background = "#6d28d9";
-  });
-  btn.addEventListener("mouseleave", () => {
-    btn.style.background = "#7c3aed";
-  });
-
-  return btn;
-}
-
-function createPanel(): HTMLIFrameElement {
-  const iframe = document.createElement("iframe");
-  iframe.id = PANEL_ID;
-
-  // Panel URL — loads the web app in the iframe
-  const apiUrl = "http://localhost:3000";
-  iframe.src = apiUrl;
-
-  iframe.style.cssText = `
-    position: fixed;
-    right: 0;
-    top: 0;
-    width: 420px;
-    height: 100vh;
-    z-index: 999998;
-    border: none;
-    border-left: 1px solid #1e1e2e;
-    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.5);
-    background: #0a0a0f;
-    transform: translateX(100%);
-    transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
-  `;
-
-  return iframe;
-}
-
-let panelOpen = false;
-
+import { trustedMessage, validPrompt } from "./config";
+const PANEL_ID = "conjure-panel",
+  TOGGLE_ID = "conjure-toggle";
 function init() {
-  // Don't inject twice
   if (document.getElementById(TOGGLE_ID)) return;
-
-  const toggle = createToggleButton();
-  const panel = createPanel();
-
-  document.body.appendChild(panel);
-  document.body.appendChild(toggle);
-
+  const panel = document.createElement("iframe"),
+    toggle = document.createElement("button");
+  panel.id = PANEL_ID;
+  panel.src = chrome.runtime.getURL("panel/index.html");
+  panel.title = "Conjure prompt studio";
+  const extensionOrigin = `chrome-extension://${chrome.runtime.id}`;
+  panel.style.cssText =
+    "position:fixed;right:0;top:0;width:min(420px,calc(100vw - 44px));height:100dvh;z-index:999998;border:0;border-left:1px solid #302740;box-shadow:-4px 0 24px #0006;background:#0a0a0f;";
+  toggle.id = TOGGLE_ID;
+  toggle.type = "button";
+  toggle.textContent = "Conjure";
+  toggle.setAttribute("aria-controls", PANEL_ID);
+  toggle.style.cssText =
+    "position:fixed;right:0;top:50%;z-index:999999;min-height:44px;min-width:44px;padding:12px 8px;background:#7c3aed;color:white;border:0;border-radius:8px 0 0 8px;font:600 12px system-ui;writing-mode:vertical-rl;cursor:pointer;";
+  let open = false;
+  function setOpen(value: boolean) {
+    open = value;
+    panel.hidden = !value;
+    panel.inert = !value;
+    toggle.setAttribute("aria-expanded", String(value));
+    toggle.setAttribute(
+      "aria-label",
+      value ? "Close Conjure panel" : "Open Conjure panel",
+    );
+    toggle.style.right = value ? "min(420px,calc(100vw - 44px))" : "0";
+  }
+  document.body.append(panel, toggle);
+  setOpen(false);
   toggle.addEventListener("click", () => {
-    panelOpen = !panelOpen;
-    panel.style.transform = panelOpen ? "translateX(0)" : "translateX(100%)";
-    toggle.style.right = panelOpen ? "420px" : "0";
-    chrome.storage.local.set({ conjurePanelOpen: panelOpen });
+    setOpen(!open);
+    void chrome.storage.local.set({ conjurePanelOpen: open });
   });
-
-  // Restore open state
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && open) {
+      setOpen(false);
+      toggle.focus();
+    }
+  });
   chrome.storage.local.get("conjurePanelOpen", (result) => {
-    if (result.conjurePanelOpen) {
-      panelOpen = true;
-      panel.style.transform = "translateX(0)";
-      toggle.style.right = "420px";
-    }
+    if (result.conjurePanelOpen === true) setOpen(true);
   });
-
-  // Listen for prompt injection messages from the panel
   window.addEventListener("message", (event) => {
-    if (event.data?.type === "CONJURE_INJECT_PROMPT") {
-      injectPromptIntoMidjourney(event.data.prompt);
+    if (!trustedMessage(event, panel.contentWindow, extensionOrigin)) return;
+    if (event.data.type === "CONJURE_CLOSE") {
+      setOpen(false);
+      toggle.focus();
+      return;
     }
+    if (
+      event.data.type !== "CONJURE_INJECT_PROMPT" ||
+      !validPrompt(event.data.prompt)
+    )
+      return;
+    const ok = injectPrompt(event.data.prompt);
+    panel.contentWindow?.postMessage(
+      { type: "CONJURE_INJECT_RESULT", ok },
+      extensionOrigin,
+    );
   });
 }
-
-function injectPromptIntoMidjourney(prompt: string) {
-  // Midjourney uses a contenteditable div or textarea for prompts
-  const selectors = [
-    'textarea[placeholder*="Imagine"]',
-    '[contenteditable][data-placeholder*="Imagine"]',
-    'textarea[name="prompt"]',
-    '[data-testid="prompt-input"]',
-    '.prompt-input',
-  ];
-
-  let input: HTMLElement | null = null;
-  for (const selector of selectors) {
-    input = document.querySelector(selector);
-    if (input) break;
-  }
-
-  if (!input) {
-    console.warn("[Conjure] Could not find Midjourney prompt input");
-    return;
-  }
-
+function injectPrompt(prompt: string): boolean {
+  const input = document.querySelector<HTMLElement>(
+    'textarea[placeholder*="Imagine"], [contenteditable="true"][data-placeholder*="Imagine"], textarea[name="prompt"], [data-testid="prompt-input"]',
+  );
   if (input instanceof HTMLTextAreaElement) {
-    input.value = prompt;
+    Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      "value",
+    )?.set?.call(input, prompt);
     input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-  } else if (input.isContentEditable) {
+  } else if (input?.isContentEditable) {
     input.textContent = prompt;
-    input.dispatchEvent(new InputEvent("input", { bubbles: true, data: prompt }));
-  }
-
+    input.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: true,
+        inputType: "insertText",
+        data: prompt,
+      }),
+    );
+  } else return false;
   input.focus();
+  return true;
 }
-
-// Run on page load
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
-} else {
-  init();
-}
+if (document.readyState === "loading")
+  document.addEventListener("DOMContentLoaded", init, { once: true });
+else init();

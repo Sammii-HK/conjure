@@ -1,301 +1,426 @@
-import { useState } from "react";
-
-type Platform = "midjourney" | "flux" | "dalle";
-type Orientation = "portrait" | "square" | "landscape";
-type Account = "sammiisparkle" | "spellbound" | "lunary" | "personal" | "";
-
-interface Variation {
-  label: string;
+import { useEffect, useRef, useState } from "react";
+import { Copy, RefreshCw, Send, X, Loader2 } from "lucide-react";
+import { API_URL, HOST_ORIGIN, trustedMessage } from "../config";
+type Variation = {
+  label: "safe" | "creative" | "experimental";
   prompt: string;
-}
-
-const API_URL = "http://localhost:3000";
-
-const ACCOUNT_OPTIONS: { value: Account; label: string }[] = [
-  { value: "", label: "No account" },
-  { value: "sammiisparkle", label: "sammiisparkle" },
-  { value: "spellbound", label: "spellbound" },
-  { value: "lunary", label: "lunary" },
-  { value: "personal", label: "personal" },
-];
-
-const LABEL_COLORS: Record<string, string> = {
-  safe: "#10b981",
-  creative: "#7c3aed",
-  experimental: "#f59e0b",
 };
-
+type Context = {
+  brief: string;
+  account: string;
+  platform: string;
+  orientation: string;
+};
+const field: React.CSSProperties = {
+  width: "100%",
+  minHeight: 44,
+  padding: 10,
+  borderRadius: 8,
+  border: "1px solid #443650",
+  background: "#15101d",
+  color: "#f1eaf8",
+  font: "inherit",
+};
+const action: React.CSSProperties = {
+  minHeight: 44,
+  padding: "8px 12px",
+  borderRadius: 8,
+  border: "1px solid #443650",
+  background: "#21172d",
+  color: "#f1eaf8",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  cursor: "pointer",
+  font: "inherit",
+};
 export default function App() {
-  const [brief, setBrief] = useState("");
-  const [account, setAccount] = useState<Account>("");
-  const [platform, setPlatform] = useState<Platform>("midjourney");
-  const [orientation, setOrientation] = useState<Orientation>("portrait");
-  const [loading, setLoading] = useState(false);
-  const [variations, setVariations] = useState<Variation[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState<number | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [refining, setRefining] = useState<number | null>(null);
-  const [refinementText, setRefinementText] = useState("");
-
-  async function generate(refinement?: string, basePrompt?: string) {
-    if (!brief.trim()) return;
-    const isRefine = !!(refinement && basePrompt && sessionId);
-
-    if (isRefine) {
-      setRefining(null);
-    } else {
-      setLoading(true);
+  const [brief, setBrief] = useState(""),
+    [account, setAccount] = useState(""),
+    [platform, setPlatform] = useState("midjourney"),
+    [orientation, setOrientation] = useState("portrait"),
+    [busy, setBusy] = useState(false),
+    [variations, setVariations] = useState<Variation[]>([]),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
+    [sessionId, setSessionId] = useState<string | null>(null),
+    [context, setContext] = useState<Context | null>(null),
+    [refining, setRefining] = useState<number | null>(null),
+    [refinement, setRefinement] = useState("");
+  const pending = useRef<AbortController | null>(null);
+  useEffect(() => {
+    function receive(event: MessageEvent) {
+      if (
+        !trustedMessage(event, window.parent, HOST_ORIGIN) ||
+        event.data.type !== "CONJURE_INJECT_RESULT"
+      )
+        return;
+      if (event.data.ok === true)
+        setNotice(
+          "Placed into Midjourney. Review it before generating an image.",
+        );
+      else
+        setError(
+          "Midjourney’s prompt field was not found. Copy the prompt and paste it manually.",
+        );
     }
-    setError(null);
-
+    window.addEventListener("message", receive);
+    return () => {
+      window.removeEventListener("message", receive);
+      pending.current?.abort();
+    };
+  }, []);
+  async function generate(index?: number) {
+    if (pending.current) return;
+    const isRefine = index !== undefined;
+    const settings =
+      isRefine && context
+        ? context
+        : { brief: brief.trim(), account, platform, orientation };
+    if (!settings.brief || (isRefine && !refinement.trim())) return;
+    const controller = new AbortController();
+    pending.current = controller;
+    setBusy(true);
+    setError("");
+    setNotice("");
     try {
-      const res = await fetch(`${API_URL}/api/generate`, {
+      const response = await fetch(`${API_URL}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
-          brief,
-          account: account || undefined,
-          platform,
-          orientation,
-          ...(isRefine ? { sessionId, refinement, basePrompt } : {}),
+          ...settings,
+          account: settings.account || undefined,
+          ...(isRefine
+            ? {
+                sessionId,
+                basePrompt: variations[index!].prompt,
+                refinement: refinement.trim(),
+              }
+            : {}),
         }),
       });
-
-      if (!res.ok) throw new Error("Generation failed");
-      const data = await res.json();
+      const data = await response.json();
+      if (!response.ok)
+        throw Error(
+          data.error || "Prompt generation could not finish. Try again.",
+        );
+      if (
+        !Array.isArray(data.variations) ||
+        data.variations.length !== 3 ||
+        new Set(data.variations.map((v: Variation) => v.label)).size !== 3 ||
+        !data.variations.every(
+          (v: Variation) =>
+            ["safe", "creative", "experimental"].includes(v.label) &&
+            typeof v.prompt === "string" &&
+            v.prompt.trim(),
+        )
+      )
+        throw Error(
+          "The reply did not contain all three prompt directions. Try again.",
+        );
       setVariations(data.variations);
+      setContext(settings);
       setSessionId(data.sessionId);
-      setRefinementText("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setRefining(null);
+      setRefinement("");
+    } catch (cause) {
+      if (!controller.signal.aborted)
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "The request could not finish.",
+        );
     } finally {
-      setLoading(false);
+      pending.current = null;
+      setBusy(false);
     }
   }
-
-  function injectPrompt(prompt: string) {
-    // Post to parent frame (content script)
-    window.parent.postMessage({ type: "CONJURE_INJECT_PROMPT", prompt }, "*");
+  async function copy(prompt: string) {
+    setError("");
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setNotice("Prompt copied.");
+    } catch {
+      setError(
+        "Copy is unavailable. Select the prompt text and copy it manually.",
+      );
+    }
   }
-
-  async function copyPrompt(prompt: string, index: number) {
-    await navigator.clipboard.writeText(prompt);
-    setCopied(index);
-    setTimeout(() => setCopied(null), 2000);
-  }
-
   return (
-    <div style={{ padding: "12px", height: "100vh", overflowY: "auto", background: "#0a0a0f" }}>
-      <div style={{ marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-        <span style={{ color: "#7c3aed", fontWeight: 700, fontSize: "14px" }}>Conjure</span>
-        <span style={{ color: "#94a3b8", fontSize: "11px" }}>AI Prompt Builder</span>
-      </div>
-
-      {/* Brief */}
-      <textarea
-        value={brief}
-        onChange={(e) => setBrief(e.target.value)}
-        placeholder="Describe what you want to create..."
-        rows={4}
+    <main
+      style={{
+        padding: 20,
+        minHeight: "100dvh",
+        background: "#0d0912",
+        color: "#f1eaf8",
+      }}
+    >
+      <header
         style={{
-          width: "100%",
-          borderRadius: "8px",
-          border: "1px solid #1e1e2e",
-          background: "#12121a",
-          color: "#e2e8f0",
-          padding: "10px",
-          fontSize: "12px",
-          resize: "vertical",
-          outline: "none",
-          marginBottom: "8px",
-          fontFamily: "inherit",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 20,
         }}
-      />
-
-      {/* Options row */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px", marginBottom: "10px" }}>
-        {([
-          { label: "Account", value: account, onChange: (v: string) => setAccount(v as Account), options: ACCOUNT_OPTIONS },
+      >
+        <div>
+          <h1 style={{ fontSize: 24 }}>Conjure</h1>
+          <p style={{ color: "#baaccb", marginTop: 4 }}>
+            Three directions for your next image.
+          </p>
+        </div>
+        <button
+          type="button"
+          style={action}
+          aria-label="Close Conjure panel"
+          onClick={() =>
+            window.parent.postMessage({ type: "CONJURE_CLOSE" }, HOST_ORIGIN)
+          }
+        >
+          <X size={18} aria-hidden />
+        </button>
+      </header>
+      <label style={{ display: "block", marginBottom: 16 }}>
+        Your image brief
+        <textarea
+          value={brief}
+          disabled={busy}
+          maxLength={2000}
+          onChange={(event) => setBrief(event.target.value)}
+          rows={4}
+          placeholder="A moonlit garden, soft silver light…"
+          style={{ ...field, marginTop: 8, resize: "vertical" }}
+        />
+      </label>
+      <div style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+        {[
           {
-            label: "Platform",
+            label: "Style profile",
+            value: account,
+            set: setAccount,
+            options: [
+              ["", "No profile"],
+              ["sammiisparkle", "sammiisparkle"],
+              ["spellbound", "spellbound"],
+              ["lunary", "lunary"],
+              ["personal", "personal"],
+            ],
+          },
+          {
+            label: "Image tool",
             value: platform,
-            onChange: (v: string) => setPlatform(v as Platform),
+            set: setPlatform,
             options: [
-              { value: "midjourney", label: "MJ" },
-              { value: "flux", label: "FLUX" },
-              { value: "dalle", label: "DALL·E" },
+              ["midjourney", "Midjourney"],
+              ["flux", "FLUX"],
+              ["dalle", "DALL·E"],
             ],
           },
           {
-            label: "Format",
+            label: "Composition",
             value: orientation,
-            onChange: (v: string) => setOrientation(v as Orientation),
+            set: setOrientation,
             options: [
-              { value: "portrait", label: "9:16" },
-              { value: "square", label: "1:1" },
-              { value: "landscape", label: "16:9" },
+              ["portrait", "Portrait 9:16"],
+              ["square", "Square 1:1"],
+              ["landscape", "Landscape 16:9"],
             ],
           },
-        ] as const).map((field) => (
-          <div key={field.label}>
-            <div style={{ fontSize: "9px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "3px" }}>
-              {field.label}
-            </div>
+        ].map((item) => (
+          <label key={item.label}>
+            {item.label}
             <select
-              value={field.value}
-              onChange={(e) => (field.onChange as (v: string) => void)(e.target.value)}
-              style={{
-                width: "100%",
-                background: "#12121a",
-                border: "1px solid #1e1e2e",
-                borderRadius: "6px",
-                color: "#e2e8f0",
-                padding: "4px 6px",
-                fontSize: "11px",
-                outline: "none",
-              }}
+              value={item.value}
+              disabled={busy}
+              onChange={(event) => item.set(event.target.value)}
+              style={{ ...field, marginTop: 6 }}
             >
-              {field.options.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
+              {item.options.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
                 </option>
               ))}
             </select>
-          </div>
+          </label>
         ))}
       </div>
-
-      {/* Generate button */}
       <button
-        onClick={() => generate()}
-        disabled={loading || !brief.trim()}
+        type="button"
+        disabled={busy || !brief.trim()}
+        onClick={() => void generate()}
         style={{
+          ...action,
           width: "100%",
-          background: loading ? "#4c1d95" : "#7c3aed",
-          color: "white",
-          border: "none",
-          borderRadius: "8px",
-          padding: "10px",
-          fontSize: "13px",
-          fontWeight: 600,
-          cursor: loading ? "not-allowed" : "pointer",
-          marginBottom: "12px",
-          opacity: !brief.trim() ? 0.5 : 1,
+          background: "#7c3aed",
+          opacity: busy || !brief.trim() ? 0.5 : 1,
         }}
       >
-        {loading ? "Conjuring..." : "Conjure"}
+        {busy ? (
+          <Loader2 size={16} aria-hidden />
+        ) : (
+          <Send size={16} aria-hidden />
+        )}
+        {busy ? "Drafting directions…" : "Draft three directions"}
       </button>
-
+      <p
+        style={{
+          color: "#baaccb",
+          fontSize: 12,
+          lineHeight: 1.6,
+          margin: "12px 0 20px",
+        }}
+      >
+        Generates prompt text through Conjure’s online service, using Groq. No
+        images are generated or submitted. Panel drafts are temporary; copy
+        prompts to keep them. Set FLUX and DALL·E dimensions in your image tool.
+      </p>
       {error && (
-        <div style={{ color: "#f87171", fontSize: "12px", marginBottom: "10px", padding: "8px", background: "#450a0a", borderRadius: "6px" }}>
-          {error}
-        </div>
-      )}
-
-      {/* Variations */}
-      {variations.map((v, i) => (
-        <div
-          key={i}
+        <p
+          role="alert"
           style={{
-            background: "#12121a",
-            border: "1px solid #1e1e2e",
-            borderRadius: "10px",
-            padding: "12px",
-            marginBottom: "10px",
+            padding: 12,
+            color: "#fca5a5",
+            border: "1px solid #7f1d1d",
+            borderRadius: 8,
+            marginBottom: 12,
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-            <span
-              style={{
-                fontSize: "10px",
-                fontWeight: 600,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                color: LABEL_COLORS[v.label] ?? "#94a3b8",
+          {error}
+        </p>
+      )}
+      <p
+        role="status"
+        style={{ fontSize: 12, color: "#c4b5fd", marginBottom: 12 }}
+      >
+        {notice}
+      </p>
+      {!variations.length && (
+        <section
+          style={{
+            border: "1px dashed #443650",
+            padding: 20,
+            borderRadius: 12,
+          }}
+        >
+          <h2 style={{ fontSize: 16, marginBottom: 8 }}>Start with an idea.</h2>
+          <p style={{ color: "#baaccb", lineHeight: 1.6 }}>
+            Explore a straightforward interpretation, an artistic variation and
+            a bolder departure.
+          </p>
+        </section>
+      )}
+      {variations.map((variation, index) => (
+        <article
+          key={`${sessionId}:${variation.label}:${variation.prompt}`}
+          style={{
+            padding: 16,
+            background: "#17101f",
+            border: "1px solid #443650",
+            borderRadius: 12,
+            marginBottom: 16,
+          }}
+        >
+          <h2 style={{ fontSize: 15, textTransform: "capitalize" }}>
+            {variation.label === "safe" ? "Straightforward" : variation.label}
+          </h2>
+          <p
+            style={{
+              whiteSpace: "pre-wrap",
+              overflowWrap: "anywhere",
+              lineHeight: 1.7,
+              margin: "14px 0",
+              fontSize: 13,
+            }}
+          >
+            {variation.prompt}
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              style={action}
+              onClick={() => void copy(variation.prompt)}
+            >
+              <Copy size={15} aria-hidden />
+              Copy
+            </button>
+            {context?.platform === "midjourney" && (
+              <button
+                type="button"
+                style={action}
+                onClick={() => {
+                  setError("");
+                  setNotice("Trying Midjourney’s prompt field…");
+                  window.parent.postMessage(
+                    { type: "CONJURE_INJECT_PROMPT", prompt: variation.prompt },
+                    HOST_ORIGIN,
+                  );
+                }}
+              >
+                <Send size={15} aria-hidden />
+                Place in Midjourney
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={busy}
+              aria-expanded={refining === index}
+              style={action}
+              onClick={() => {
+                setRefining(refining === index ? null : index);
+                setRefinement("");
               }}
             >
-              {v.label}
-            </span>
-            <div style={{ display: "flex", gap: "6px" }}>
-              <button
-                onClick={() => copyPrompt(v.prompt, i)}
-                style={smallBtn("#1e1e2e")}
-                title="Copy"
-              >
-                {copied === i ? "Copied!" : "Copy"}
-              </button>
-              <button
-                onClick={() => injectPrompt(v.prompt)}
-                style={smallBtn("#3b0764")}
-                title="Inject into Midjourney"
-              >
-                Inject
-              </button>
-            </div>
+              <RefreshCw size={15} aria-hidden />
+              Refine
+            </button>
           </div>
-
-          <p style={{ fontSize: "11px", color: "#e2e8f0", lineHeight: 1.5, fontFamily: "monospace", wordBreak: "break-word" }}>
-            {v.prompt}
-          </p>
-
-          {/* Refine */}
-          {sessionId && (
-            <div style={{ marginTop: "8px", borderTop: "1px solid #1e1e2e", paddingTop: "8px" }}>
-              {refining === i ? (
-                <div style={{ display: "flex", gap: "6px" }}>
-                  <input
-                    type="text"
-                    value={refinementText}
-                    onChange={(e) => setRefinementText(e.target.value)}
-                    placeholder="more dreamy, warmer..."
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") generate(refinementText, v.prompt);
-                    }}
-                    style={{
-                      flex: 1,
-                      background: "#0a0a0f",
-                      border: "1px solid #1e1e2e",
-                      borderRadius: "6px",
-                      color: "#e2e8f0",
-                      padding: "4px 8px",
-                      fontSize: "11px",
-                      outline: "none",
-                    }}
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => generate(refinementText, v.prompt)}
-                    style={smallBtn("#7c3aed")}
-                  >
-                    Go
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setRefining(i)}
-                  style={{ fontSize: "11px", color: "#94a3b8", background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                >
-                  + Refine this prompt
-                </button>
-              )}
+          {refining === index && (
+            <div style={{ marginTop: 12 }}>
+              <label>
+                What should change?
+                <input
+                  style={{ ...field, marginTop: 6 }}
+                  disabled={busy}
+                  value={refinement}
+                  maxLength={1000}
+                  onChange={(event) => setRefinement(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void generate(index);
+                  }}
+                  placeholder="Warmer light, wider composition…"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={busy || !refinement.trim()}
+                style={{ ...action, marginTop: 8 }}
+                onClick={() => void generate(index)}
+              >
+                Refine direction
+              </button>
             </div>
           )}
-        </div>
+        </article>
       ))}
-    </div>
+      <a
+        href={`${API_URL}/library`}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          color: "#c4b5fd",
+          display: "inline-flex",
+          alignItems: "center",
+          minHeight: 44,
+        }}
+      >
+        Open the web studio and library
+      </a>
+      <p style={{ fontSize: 12, color: "#baaccb", lineHeight: 1.6 }}>
+        The web library belongs to the browser where you save it. Panel drafts
+        do not sync to that library.
+      </p>
+    </main>
   );
-}
-
-function smallBtn(bg: string): React.CSSProperties {
-  return {
-    background: bg,
-    color: "#e2e8f0",
-    border: "none",
-    borderRadius: "5px",
-    padding: "3px 8px",
-    fontSize: "10px",
-    cursor: "pointer",
-    fontWeight: 500,
-  };
 }

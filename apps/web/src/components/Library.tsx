@@ -1,207 +1,351 @@
 "use client";
-
-import { useState, useEffect, useCallback } from "react";
-import { Search, Filter, Trash2, ExternalLink, Star, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import {
+  Search,
+  Trash2,
+  ArrowUpRight,
+  Star,
+  Loader2,
+  Copy,
+  RefreshCw,
+} from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import type { SavedPrompt, PromptLabel } from "@/types";
-
-const LABEL_VARIANT: Record<string, "safe" | "creative" | "experimental"> = {
-  safe: "safe",
-  creative: "creative",
-  experimental: "experimental",
-};
-
+import { readLocalPrompts } from "@/lib/local-library";
+import { favouriteSaved, removeSaved } from "@/lib/library-client";
+import type { SavedPrompt } from "@/types";
 export function Library() {
-  const [prompts, setPrompts] = useState<SavedPrompt[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filterAccount, setFilterAccount] = useState("");
-  const [filterRating, setFilterRating] = useState<"all" | "good" | "bad">("all");
-  const [filterFavourites, setFilterFavourites] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
-
-  const fetchPrompts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (filterAccount) params.set("account", filterAccount);
-      if (filterRating !== "all") params.set("rating", filterRating);
-      if (filterFavourites) params.set("favourites", "true");
-
-      const res = await fetch(`/api/prompts?${params.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        setPrompts(data);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [filterAccount, filterRating, filterFavourites]);
-
+  const [prompts, setPrompts] = useState<SavedPrompt[]>([]),
+    [loading, setLoading] = useState(true),
+    [search, setSearch] = useState(""),
+    [account, setAccount] = useState(""),
+    [rating, setRating] = useState("all"),
+    [favourites, setFavourites] = useState(false),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
+    [pending, setPending] = useState<string | null>(null),
+    [refresh, setRefresh] = useState(0);
   useEffect(() => {
-    fetchPrompts();
-  }, [fetchPrompts]);
-
-  async function handleDelete(id: string) {
-    setDeleting(id);
+    let active = true;
+    const controller = new AbortController();
+    setLoading(true);
+    setError("");
+    let local: SavedPrompt[] = [];
     try {
-      const res = await fetch(`/api/prompts/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        setPrompts((prev) => prev.filter((p) => p.id !== id));
+      local = readLocalPrompts(localStorage);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "This browser’s saved prompts could not be read.",
+      );
+    }
+    setPrompts(local);
+    void (async () => {
+      try {
+        const response = await fetch("/api/prompts", {
+          signal: controller.signal,
+        });
+        if (response.status === 401) return;
+        if (!response.ok)
+          throw new Error(
+            "The account library is unavailable. Browser saves are still shown.",
+          );
+        const data = await response.json();
+        if (!Array.isArray(data))
+          throw new Error(
+            "The account library returned an incomplete response.",
+          );
+        if (active)
+          setPrompts([
+            ...local,
+            ...data.map((item) => ({ ...item, storage: "account" as const })),
+          ]);
+      } catch (cause) {
+        if (active && !controller.signal.aborted)
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "The account library could not load. Browser saves are still shown.",
+          );
+      } finally {
+        if (active) setLoading(false);
       }
+    })();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [refresh]);
+  async function change(prompt: SavedPrompt, kind: "favourite" | "remove") {
+    if (pending) return;
+    setPending(prompt.id);
+    setError("");
+    try {
+      if (kind === "remove") {
+        await removeSaved(prompt);
+        setPrompts((current) =>
+          current.filter((item) => item.id !== prompt.id),
+        );
+        setNotice("Prompt removed from this library.");
+      } else {
+        const next = await favouriteSaved(prompt);
+        setPrompts((current) =>
+          current.map((item) => (item.id === prompt.id ? next : item)),
+        );
+        setNotice(
+          next.favourite ? "Added to favourites." : "Removed from favourites.",
+        );
+      }
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Your library change could not be saved.",
+      );
     } finally {
-      setDeleting(null);
+      setPending(null);
     }
   }
-
-  async function handleUseAsBase(prompt: SavedPrompt) {
-    const params = new URLSearchParams({
-      brief: prompt.iteration.session.brief,
-      base: prompt.output,
-    });
-    window.location.href = `/?${params.toString()}`;
+  async function copy(prompt: SavedPrompt) {
+    setError("");
+    try {
+      await navigator.clipboard.writeText(prompt.output);
+      setNotice("Prompt copied.");
+    } catch {
+      setError(
+        "Copy is unavailable. Select the prompt text and copy it manually.",
+      );
+    }
   }
-
-  const filtered = prompts.filter((p) => {
-    if (!search) return true;
+  const filtered = prompts.filter((prompt) => {
+    const session = prompt.iteration.session;
     return (
-      p.output.toLowerCase().includes(search.toLowerCase()) ||
-      p.iteration.session.brief.toLowerCase().includes(search.toLowerCase())
+      (!account || session.account === account) &&
+      (rating === "all" || prompt.rating === (rating === "good" ? 1 : -1)) &&
+      (!favourites || prompt.favourite) &&
+      (!search.trim() ||
+        (prompt.output + " " + session.brief)
+          .toLowerCase()
+          .includes(search.trim().toLowerCase()))
     );
   });
-
-  const accounts = [...new Set(prompts.map((p) => p.iteration.session.account).filter(Boolean))];
-
+  const accounts = [
+    ...new Set(
+      prompts
+        .map((prompt) => prompt.iteration.session.account)
+        .filter((value): value is string => !!value),
+    ),
+  ];
   return (
     <div className="space-y-6">
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <div className="flex-1 min-w-[200px]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted/50" />
+      <div className="rounded-xl border border-border bg-card px-4 py-3 text-sm leading-relaxed text-text-muted">
+        Browser saves stay on this device. They are not account-synced or backed
+        up. If an existing account session is available, its saved prompts are
+        shown separately.
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="min-w-[min(100%,16rem)] flex-1 space-y-2 text-xs text-text-muted">
+          Search your prompts
+          <span className="relative block">
+            <Search
+              size={16}
+              aria-hidden
+              className="absolute left-3 top-1/2 -translate-y-1/2"
+            />
             <Input
+              type="search"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search prompts..."
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="A phrase, subject or original brief"
               className="pl-9"
             />
-          </div>
-        </div>
-
+          </span>
+        </label>
         {accounts.length > 0 && (
-          <select
-            value={filterAccount}
-            onChange={(e) => setFilterAccount(e.target.value)}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-text focus:border-accent/50 focus:outline-none"
-          >
-            <option value="">All accounts</option>
-            {accounts.map((a) => (
-              <option key={a} value={a ?? ""}>
-                {a}
-              </option>
-            ))}
-          </select>
+          <label className="space-y-2 text-xs text-text-muted">
+            Style profile
+            <select
+              value={account}
+              onChange={(event) => setAccount(event.target.value)}
+              className="min-h-11 rounded-lg border border-border bg-card px-3 text-sm text-text"
+            >
+              <option value="">All profiles</option>
+              {accounts.map((value) => (
+                <option key={value}>{value}</option>
+              ))}
+            </select>
+          </label>
         )}
-
-        <select
-          value={filterRating}
-          onChange={(e) => setFilterRating(e.target.value as typeof filterRating)}
-          className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-text focus:border-accent/50 focus:outline-none"
-        >
-          <option value="all">All ratings</option>
-          <option value="good">Liked</option>
-          <option value="bad">Disliked</option>
-        </select>
-
+        <label className="space-y-2 text-xs text-text-muted">
+          Rating
+          <select
+            value={rating}
+            onChange={(event) => setRating(event.target.value)}
+            className="min-h-11 rounded-lg border border-border bg-card px-3 text-sm text-text"
+          >
+            <option value="all">All ratings</option>
+            <option value="good">Liked</option>
+            <option value="bad">Disliked</option>
+          </select>
+        </label>
         <Button
-          variant={filterFavourites ? "primary" : "secondary"}
-          size="md"
-          onClick={() => setFilterFavourites(!filterFavourites)}
+          variant={favourites ? "primary" : "secondary"}
+          aria-pressed={favourites}
+          onClick={() => setFavourites(!favourites)}
         >
-          <Star className="h-4 w-4" />
+          <Star size={16} aria-hidden />
           Favourites
         </Button>
+        <Button
+          variant="ghost"
+          aria-label="Refresh library"
+          onClick={() => setRefresh((value) => value + 1)}
+        >
+          <RefreshCw size={16} aria-hidden />
+        </Button>
       </div>
-
-      {/* Grid */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-text-muted" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card p-12 text-center">
-          <p className="text-text-muted">
-            {prompts.length === 0
-              ? "No saved prompts yet. Generate some and save the ones you like!"
-              : "No prompts match your filters."}
+      {error && (
+        <p
+          role="alert"
+          className="rounded-xl border border-red-800/50 bg-red-950/30 p-4 text-sm text-red-200"
+        >
+          {error}
+        </p>
+      )}
+      <p role="status" className="text-xs text-text-muted">
+        {notice ||
+          `${filtered.length} ${filtered.length === 1 ? "prompt" : "prompts"} shown`}
+      </p>
+      {loading && (
+        <p className="flex items-center gap-2 text-sm text-text-muted">
+          <Loader2
+            size={16}
+            aria-hidden
+            className="animate-spin motion-reduce:animate-none"
+          />
+          Checking the account library…
+        </p>
+      )}
+      {!loading && !filtered.length ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card/50 px-6 py-12">
+          <h2 className="text-xl font-semibold">
+            {prompts.length
+              ? "No prompts match this view."
+              : "Keep the directions worth returning to."}
+          </h2>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-text-muted">
+            {prompts.length
+              ? "Try a different phrase, rating or profile."
+              : "Your library starts with a saved prompt. Create a few directions, save what works and come back here to remix it."}
           </p>
+          {prompts.length ? (
+            <Button
+              variant="secondary"
+              className="mt-5"
+              onClick={() => {
+                setSearch("");
+                setAccount("");
+                setRating("all");
+                setFavourites(false);
+              }}
+            >
+              Clear filters
+            </Button>
+          ) : (
+            <Link
+              href="/"
+              className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm text-violet-300"
+            >
+              Open the prompt studio <ArrowUpRight size={16} aria-hidden />
+            </Link>
+          )}
         </div>
       ) : (
         <div className="grid gap-4">
           {filtered.map((prompt) => (
-            <div
+            <article
               key={prompt.id}
-              className="rounded-xl border border-border bg-card p-4 group hover:border-accent/30 transition-all"
+              className="rounded-2xl border border-border bg-card p-5 sm:p-6"
             >
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant={LABEL_VARIANT[prompt.label as PromptLabel] ?? "default"}>
-                    {prompt.label}
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={prompt.label}>
+                    {prompt.label === "safe" ? "Straightforward" : prompt.label}
                   </Badge>
-                  {prompt.iteration.session.account && (
-                    <Badge variant="account">
-                      {prompt.iteration.session.account}
-                    </Badge>
-                  )}
                   <Badge>{prompt.iteration.session.platform}</Badge>
-                  {prompt.rating === 1 && (
-                    <span className="text-xs text-emerald-400">Liked</span>
-                  )}
-                  {prompt.rating === -1 && (
-                    <span className="text-xs text-red-400">Disliked</span>
-                  )}
+                  <span className="text-xs text-text-muted">
+                    {prompt.storage === "browser"
+                      ? "On this browser"
+                      : "Account library"}
+                  </span>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex flex-wrap gap-1">
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleUseAsBase(prompt)}
-                    title="Use as base for a new prompt"
+                    aria-label={
+                      prompt.favourite ? "Remove favourite" : "Add favourite"
+                    }
+                    aria-pressed={prompt.favourite}
+                    disabled={!!pending}
+                    onClick={() => void change(prompt, "favourite")}
                   >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    Remix
+                    <Star
+                      size={16}
+                      fill={prompt.favourite ? "currentColor" : "none"}
+                      aria-hidden
+                    />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Copy saved prompt"
+                    onClick={() => void copy(prompt)}
+                  >
+                    <Copy size={16} aria-hidden />
                   </Button>
                   <Button
                     variant="danger"
                     size="sm"
-                    onClick={() => handleDelete(prompt.id)}
-                    disabled={deleting === prompt.id}
+                    aria-label="Remove prompt from library"
+                    disabled={!!pending}
+                    onClick={() => void change(prompt, "remove")}
                   >
-                    {deleting === prompt.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {pending === prompt.id ? (
+                      <Loader2
+                        size={16}
+                        className="animate-spin motion-reduce:animate-none"
+                        aria-hidden
+                      />
                     ) : (
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 size={16} aria-hidden />
                     )}
                   </Button>
                 </div>
               </div>
-
               {prompt.iteration.refinement && (
-                <p className="text-xs text-accent/80 mb-2 italic">
-                  Refined: "{prompt.iteration.refinement}"
+                <p className="mb-3 text-xs text-violet-300">
+                  Refinement: {prompt.iteration.refinement}
                 </p>
               )}
-
-              <p className="text-sm text-text leading-relaxed font-mono whitespace-pre-wrap break-words">
+              <p className="break-words whitespace-pre-wrap font-mono text-sm leading-relaxed">
                 {prompt.output}
               </p>
-
-              <p className="mt-2 text-xs text-text-muted/60 truncate">
-                Brief: {prompt.iteration.session.brief}
-              </p>
-            </div>
+              <div className="mt-5 flex flex-wrap items-end justify-between gap-3 border-t border-border pt-4">
+                <p className="min-w-0 max-w-xl flex-1 text-xs leading-relaxed text-text-muted">
+                  Original brief: {prompt.iteration.session.brief}
+                </p>
+                <Link
+                  href={`/?${new URLSearchParams({ brief: prompt.iteration.session.brief, base: prompt.output }).toString()}`}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-violet-300"
+                >
+                  Remix this prompt <ArrowUpRight size={16} aria-hidden />
+                </Link>
+              </div>
+            </article>
           ))}
         </div>
       )}

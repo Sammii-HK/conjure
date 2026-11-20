@@ -1,54 +1,30 @@
-import Link from "next/link";
-import { BookOpen, Wand2 } from "lucide-react";
 import { PromptBuilder } from "@/components/PromptBuilder";
-
-interface SearchParams {
-  brief?: string;
-  base?: string;
-}
-
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<SearchParams>;
+  searchParams: Promise<{ brief?: string; base?: string }>;
 }) {
   const params = await searchParams;
-
   return (
-    <div className="min-h-screen" style={{ background: "#0a0a0f" }}>
-      {/* Header */}
-      <header className="border-b border-border/50">
-        <div className="mx-auto max-w-3xl px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Wand2 className="h-5 w-5 text-accent" />
-            <span className="font-semibold text-text">Conjure</span>
-          </div>
-          <Link
-            href="/library"
-            className="flex items-center gap-1.5 text-sm text-text-muted hover:text-text transition-colors"
-          >
-            <BookOpen className="h-4 w-4" />
-            Library
-          </Link>
-        </div>
+    <main id="main" className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
+      <header className="mb-10 max-w-3xl">
+        <p className="mb-4 text-xs uppercase tracking-[.22em] text-violet-300">
+          A little more intention, before the image
+        </p>
+        <h1 className="text-4xl font-semibold leading-[1.08] tracking-tight sm:text-6xl">
+          Give the idea
+          <br />
+          <span className="text-text-muted">a clearer direction.</span>
+        </h1>
+        <p className="mt-6 max-w-xl text-base leading-relaxed text-text-muted">
+          Turn a brief into three image prompts. Compare the interpretations,
+          refine what interests you and keep the ones you want to use.
+        </p>
       </header>
-
-      {/* Main */}
-      <main className="mx-auto max-w-3xl px-4 py-8">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-text mb-2">
-            Conjure the perfect prompt
-          </h1>
-          <p className="text-text-muted">
-            Describe your vision and get 3 Midjourney-ready variations, instantly.
-          </p>
-        </div>
-
-        <PromptBuilder
-          initialBrief={params.brief ?? ""}
-          initialPrompt={params.base ?? ""}
-        />
-      </main>
-    </div>
+      <PromptBuilder
+        initialBrief={params.brief ?? ""}
+        initialPrompt={params.base ?? ""}
+      />
+    </main>
   );
 }

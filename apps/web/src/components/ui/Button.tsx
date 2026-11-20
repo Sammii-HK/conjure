@@ -9,10 +9,14 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "primary", size = "md", ...props }, ref) => {
+  (
+    { className, variant = "primary", size = "md", type = "button", ...props },
+    ref,
+  ) => {
     return (
       <button
         ref={ref}
+        type={type}
         className={cn(
           "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed",
           {
@@ -20,21 +24,22 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               variant === "primary",
             "bg-card border border-border hover:border-accent/50 text-text":
               variant === "secondary",
-            "hover:bg-card text-text-muted hover:text-text": variant === "ghost",
+            "hover:bg-card text-text-muted hover:text-text":
+              variant === "ghost",
             "bg-red-900/50 hover:bg-red-900 text-red-300 border border-red-800":
               variant === "danger",
           },
           {
-            "px-3 py-1.5 text-xs": size === "sm",
-            "px-4 py-2 text-sm": size === "md",
-            "px-6 py-3 text-base": size === "lg",
+            "min-h-11 px-3 py-2 text-xs": size === "sm",
+            "min-h-11 px-4 py-2 text-sm": size === "md",
+            "min-h-12 px-6 py-3 text-base": size === "lg",
           },
-          className
+          className,
         )}
         {...props}
       />
     );
-  }
+  },
 );
 
 Button.displayName = "Button";

@@ -1,11 +1,7 @@
 export type Platform = "midjourney" | "flux" | "dalle";
 export type Orientation = "portrait" | "square" | "landscape";
 export type PromptLabel = "safe" | "creative" | "experimental";
-export type Account =
-  | "sammiisparkle"
-  | "spellbound"
-  | "lunary"
-  | "personal";
+export type Account = "sammiisparkle" | "spellbound" | "lunary" | "personal";
 
 export interface PromptVariation {
   label: PromptLabel;
@@ -26,9 +22,11 @@ export interface GenerateResponse {
   sessionId: string;
   iterationId: string;
   variations: PromptVariation[];
+  storage: "browser" | "account";
 }
 
 export interface SavedPrompt {
+  storage: "browser" | "account";
   id: string;
   label: PromptLabel;
   output: string;
@@ -49,20 +47,13 @@ export interface SavedPrompt {
   };
 }
 
-export const PLATFORM_PARAMS: Record<
-  Platform,
-  Record<Orientation, string>
-> = {
+export const PLATFORM_PARAMS: Record<Platform, Record<Orientation, string>> = {
   midjourney: {
-    portrait: "--ar 9:16 --v 6.1 --stylize 750",
-    square: "--ar 1:1 --v 6.1 --stylize 750",
-    landscape: "--ar 16:9 --v 6.1 --stylize 750",
-  },
-  flux: {
     portrait: "--ar 9:16",
     square: "--ar 1:1",
     landscape: "--ar 16:9",
   },
+  flux: { portrait: "", square: "", landscape: "" },
   dalle: {
     portrait: "1024x1792",
     square: "1024x1024",
@@ -77,5 +68,6 @@ export const ACCOUNT_STYLE_HINTS: Record<string, string> = {
     "witchy illustration style, bold ink lines, dark mystical atmosphere, tarot card aesthetics, occult symbolism, gothic botanical",
   lunary:
     "cosmic astrology visuals, deep space blues and purples, celestial bodies, modern minimal spiritual, clean editorial",
-  personal: "authentic candid style, natural light, genuine emotion, documentary photography",
+  personal:
+    "authentic candid style, natural light, genuine emotion, documentary photography",
 };
