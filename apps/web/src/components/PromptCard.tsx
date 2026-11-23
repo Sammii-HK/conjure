@@ -93,7 +93,7 @@ export function PromptCard({
   const action =
     "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-border hover:text-text disabled:opacity-40";
   return (
-    <article className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+    <article className="rounded-2xl border border-border bg-card p-5 transition-all duration-200 hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5 sm:p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <Badge variant={variation.label}>
@@ -108,7 +108,8 @@ export function PromptCard({
         >
           <button
             type="button"
-            className={action}
+            className={`${action} ${saved?.rating === 1 ? "bg-emerald-900/30 text-emerald-400" : "hover:text-emerald-400"}`}
+            title="Good prompt"
             aria-label="Like this prompt"
             aria-pressed={saved?.rating === 1}
             disabled={pending}
@@ -118,7 +119,8 @@ export function PromptCard({
           </button>
           <button
             type="button"
-            className={action}
+            className={`${action} ${saved?.rating === -1 ? "bg-red-900/30 text-red-400" : "hover:text-red-400"}`}
+            title="Not great"
             aria-label="Dislike this prompt"
             aria-pressed={saved?.rating === -1}
             disabled={pending}
@@ -128,7 +130,8 @@ export function PromptCard({
           </button>
           <button
             type="button"
-            className={action}
+            className={`${action} ${saved ? "text-accent-text" : "hover:text-accent-text"}`}
+            title={saved ? "Saved to library" : "Save to library"}
             aria-label={saved ? "Prompt saved" : "Save prompt"}
             disabled={pending || !!saved || !iterationId}
             onClick={() => void save()}
@@ -147,7 +150,8 @@ export function PromptCard({
           </button>
           <button
             type="button"
-            className={action}
+            className={`${action} ${copied ? "bg-emerald-900/30 text-emerald-400" : ""}`}
+            title="Copy to clipboard"
             aria-label="Copy prompt"
             onClick={() => void copy()}
           >

@@ -266,14 +266,25 @@ export function Library() {
           {filtered.map((prompt) => (
             <article
               key={prompt.id}
-              className="rounded-2xl border border-border bg-card p-5 sm:p-6"
+              className="rounded-2xl border border-border bg-card p-5 transition-all hover:border-accent/30 sm:p-6"
             >
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant={prompt.label}>
                     {prompt.label === "safe" ? "Straightforward" : prompt.label}
                   </Badge>
+                  {prompt.iteration.session.account && (
+                    <Badge variant="account">
+                      {prompt.iteration.session.account}
+                    </Badge>
+                  )}
                   <Badge>{prompt.iteration.session.platform}</Badge>
+                  {prompt.rating === 1 && (
+                    <span className="text-xs text-emerald-400">Liked</span>
+                  )}
+                  {prompt.rating === -1 && (
+                    <span className="text-xs text-red-400">Disliked</span>
+                  )}
                   <span className="text-xs text-text-muted">
                     {prompt.storage === "browser"
                       ? "On this browser"
@@ -288,6 +299,7 @@ export function Library() {
                       prompt.favourite ? "Remove favourite" : "Add favourite"
                     }
                     aria-pressed={prompt.favourite}
+                    title={prompt.favourite ? "Remove from favourites" : "Add to favourites"}
                     disabled={!!pending}
                     onClick={() => void change(prompt, "favourite")}
                   >
@@ -301,6 +313,7 @@ export function Library() {
                     variant="ghost"
                     size="sm"
                     aria-label="Copy saved prompt"
+                    title="Copy to clipboard"
                     onClick={() => void copy(prompt)}
                   >
                     <Copy size={16} aria-hidden />
@@ -309,6 +322,7 @@ export function Library() {
                     variant="danger"
                     size="sm"
                     aria-label="Remove prompt from library"
+                    title="Delete"
                     disabled={!!pending}
                     onClick={() => void change(prompt, "remove")}
                   >
@@ -338,6 +352,7 @@ export function Library() {
                 </p>
                 <Link
                   href={`/?${new URLSearchParams({ brief: prompt.iteration.session.brief, base: prompt.output }).toString()}`}
+                  title="Use as base for a new prompt"
                   className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-violet-300"
                 >
                   Remix this prompt <ArrowUpRight size={16} aria-hidden />
