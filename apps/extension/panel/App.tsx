@@ -272,9 +272,8 @@ export default function App() {
           margin: "12px 0 20px",
         }}
       >
-        Generates prompt text through Conjure’s online service, using Groq. No
-        images are generated or submitted. Panel drafts are temporary; copy
-        prompts to keep them. Set FLUX and DALL·E dimensions in your image tool.
+        Writes prompt text for you to place or copy. Nothing is submitted to
+        Midjourney until you press generate. Copy a prompt to keep it.
       </p>
       {error && (
         <p
@@ -418,8 +417,7 @@ export default function App() {
         Open the web studio and library
       </a>
       <p style={{ fontSize: 12, color: "#baaccb", lineHeight: 1.6 }}>
-        The web library belongs to the browser where you save it. Panel drafts
-        do not sync to that library.
+        Save prompts you want to keep in the web studio.
       </p>
     </main>
   );

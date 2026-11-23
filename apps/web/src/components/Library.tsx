@@ -141,11 +141,9 @@ export function Library() {
   ];
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-border bg-card px-4 py-3 text-sm leading-relaxed text-text-muted">
-        Browser saves stay on this device. They are not account-synced or backed
-        up. If an existing account session is available, its saved prompts are
-        shown separately.
-      </div>
+      <p className="text-sm leading-relaxed text-text-muted">
+        Prompts you save are kept in this browser.
+      </p>
       <div className="flex flex-wrap items-end gap-3">
         <label className="min-w-[min(100%,16rem)] flex-1 space-y-2 text-xs text-text-muted">
           Search your prompts
@@ -226,7 +224,7 @@ export function Library() {
             aria-hidden
             className="animate-spin motion-reduce:animate-none"
           />
-          Checking the account library…
+          Loading your library…
         </p>
       )}
       {!loading && !filtered.length ? (

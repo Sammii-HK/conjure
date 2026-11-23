@@ -154,8 +154,7 @@ export function PromptBuilder({
         </div>
         {initialPrompt && (
           <div className="mt-4 rounded-lg border border-violet-500/25 bg-accent/10 p-3 text-xs leading-relaxed text-violet-200">
-            Remixing a saved prompt. Its text is included as a reference; it is
-            not discarded when you generate.
+            Remixing a saved prompt. Its text is used as a starting point.
           </div>
         )}
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -273,9 +272,9 @@ export function PromptBuilder({
           <>
             <p className="text-xs leading-relaxed text-text-muted">
               {result.storage === "browser"
-                ? "Save and rate on this browser. These prompts are not synced to an account."
-                : "Save and rate in your account library."}{" "}
-              Refining keeps the brief and settings used for these results.
+                ? "Save and rate the ones you like. They are kept in this browser."
+                : "Save and rate the ones you like in your library."}{" "}
+              Refining keeps your brief and settings.
             </p>
             {result.variations.map((variation, index) => (
               <PromptCard
@@ -306,8 +305,7 @@ export function PromptBuilder({
             </p>
             <p className="mt-4 max-w-md text-sm leading-relaxed text-text-muted">
               Write a brief to see the differences. Keep a direction, refine it
-              or copy it into your image tool. Conjure writes prompts; it does
-              not generate images here.
+              or copy it into your image tool.
             </p>
             <a
               href="/library"

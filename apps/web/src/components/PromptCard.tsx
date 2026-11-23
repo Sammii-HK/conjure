@@ -72,8 +72,8 @@ export function PromptCard({
       setSaved(prompt);
       setNotice(
         storage === "browser"
-          ? "Saved on this browser."
-          : "Saved to your account library.",
+          ? "Saved to your library."
+          : "Saved to your library.",
       );
     } catch (cause) {
       setError(
@@ -164,7 +164,7 @@ export function PromptCard({
       </p>
       <p role="status" className="mt-3 min-h-4 text-xs text-text-muted">
         {notice ||
-          `Save ${storage === "browser" ? "on this browser" : "to your account"}, or copy into your image tool.`}
+          "Save it, or copy it into your image tool."}
       </p>
       {error && (
         <p role="alert" className="mt-2 text-xs text-red-300">
