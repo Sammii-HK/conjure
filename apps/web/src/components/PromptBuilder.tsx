@@ -118,7 +118,7 @@ export function PromptBuilder({
         className="rounded-2xl border border-border bg-card p-5 sm:p-7 lg:sticky lg:top-6"
       >
         <div className="mb-6 flex items-center gap-3">
-          <span className="rounded-xl bg-accent/15 p-2.5 text-violet-300">
+          <span className="rounded-xl bg-accent/15 p-2.5 text-accent-text">
             <Wand2 size={20} aria-hidden />
           </span>
           <div>
@@ -140,7 +140,7 @@ export function PromptBuilder({
           onChange={(event) => setBrief(event.target.value)}
           rows={7}
           placeholder="The subject, the atmosphere, a detail you don’t want to lose…"
-          className="w-full resize-y rounded-xl border border-border bg-background px-4 py-3 text-sm leading-relaxed text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
+          className="w-full resize-y rounded-xl border border-input bg-background px-4 py-3 text-sm leading-relaxed text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
           onKeyDown={(event) => {
             if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
               event.preventDefault();
@@ -153,7 +153,7 @@ export function PromptBuilder({
           <span>{brief.length}/2000</span>
         </div>
         {initialPrompt && (
-          <div className="mt-4 rounded-lg border border-violet-500/25 bg-accent/10 p-3 text-xs leading-relaxed text-violet-200">
+          <div className="mt-4 rounded-lg border border-violet-500/25 bg-accent/10 p-3 text-xs leading-relaxed text-accent-text">
             Remixing a saved prompt. Its text is used as a starting point.
           </div>
         )}
@@ -164,7 +164,7 @@ export function PromptBuilder({
               aria-label="Image tool"
               value={platform}
               onChange={(event) => setPlatform(event.target.value as Platform)}
-              className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-text"
+              className="min-h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-text"
             >
               {[
                 ["midjourney", "Midjourney"],
@@ -185,7 +185,7 @@ export function PromptBuilder({
               onChange={(event) =>
                 setOrientation(event.target.value as Orientation)
               }
-              className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-text"
+              className="min-h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-text"
             >
               {[
                 ["portrait", "Portrait / 9:16"],
@@ -206,7 +206,7 @@ export function PromptBuilder({
               onChange={(event) =>
                 setAccount(event.target.value as Account | "")
               }
-              className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-text"
+              className="min-h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-text"
             >
               {ACCOUNTS.map(([value, label]) => (
                 <option value={value} key={value}>
@@ -263,7 +263,7 @@ export function PromptBuilder({
         {error && (
           <p
             role="alert"
-            className="rounded-xl border border-red-700/40 bg-red-950/30 p-4 text-sm text-red-200"
+            className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-700/40 dark:bg-red-950/30 dark:text-red-200"
           >
             {error}
           </p>
@@ -309,7 +309,7 @@ export function PromptBuilder({
             </p>
             <a
               href="/library"
-              className="mt-7 inline-flex min-h-11 items-center gap-2 text-sm text-violet-300"
+              className="mt-7 inline-flex min-h-11 items-center gap-2 text-sm text-accent-text"
             >
               Visit your library <ArrowUpRight size={16} aria-hidden />
             </a>

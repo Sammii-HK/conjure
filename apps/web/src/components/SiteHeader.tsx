@@ -11,7 +11,7 @@ export function SiteHeader() {
           href="/"
           className="inline-flex min-h-11 items-center gap-3 rounded-lg font-semibold tracking-tight"
         >
-          <span className="rounded-lg bg-accent/15 p-2 text-violet-300">
+          <span className="rounded-lg bg-accent/15 p-2 text-accent-text">
             <Wand2 size={19} aria-hidden />
           </span>
           Conjure

@@ -108,7 +108,7 @@ export function PromptCard({
         >
           <button
             type="button"
-            className={`${action} ${saved?.rating === 1 ? "bg-emerald-900/30 text-emerald-400" : "hover:text-emerald-400"}`}
+            className={`${action} ${saved?.rating === 1 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "hover:text-emerald-700 dark:hover:text-emerald-400"}`}
             title="Good prompt"
             aria-label="Like this prompt"
             aria-pressed={saved?.rating === 1}
@@ -119,7 +119,7 @@ export function PromptCard({
           </button>
           <button
             type="button"
-            className={`${action} ${saved?.rating === -1 ? "bg-red-900/30 text-red-400" : "hover:text-red-400"}`}
+            className={`${action} ${saved?.rating === -1 ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "hover:text-red-700 dark:hover:text-red-400"}`}
             title="Not great"
             aria-label="Dislike this prompt"
             aria-pressed={saved?.rating === -1}
@@ -150,7 +150,7 @@ export function PromptCard({
           </button>
           <button
             type="button"
-            className={`${action} ${copied ? "bg-emerald-900/30 text-emerald-400" : ""}`}
+            className={`${action} ${copied ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : ""}`}
             title="Copy to clipboard"
             aria-label="Copy prompt"
             onClick={() => void copy()}
@@ -171,7 +171,7 @@ export function PromptCard({
           "Save it, or copy it into your image tool."}
       </p>
       {error && (
-        <p role="alert" className="mt-2 text-xs text-red-300">
+        <p role="alert" className="mt-2 text-xs text-red-700 dark:text-red-300">
           {error}
         </p>
       )}
@@ -202,7 +202,7 @@ export function PromptCard({
                   disabled={disabled}
                   onChange={(event) => onRefinementChange(event.target.value)}
                   placeholder="Warmer light, a wider composition…"
-                  className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-text"
+                  className="min-h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-text"
                   onKeyDown={(event) => {
                     if (
                       event.key === "Enter" &&

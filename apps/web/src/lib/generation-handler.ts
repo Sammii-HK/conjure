@@ -90,7 +90,7 @@ export function generationHandler(deps: GenerationDependencies) {
       return Response.json(
         {
           error:
-            "Prompt generation is unavailable here. Your saved prompts are still accessible.",
+            "Prompt generation is unavailable right now. Your saved prompts are still in your library.",
         },
         { status: 503 },
       );

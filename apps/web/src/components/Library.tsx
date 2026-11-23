@@ -168,7 +168,7 @@ export function Library() {
             <select
               value={account}
               onChange={(event) => setAccount(event.target.value)}
-              className="min-h-11 rounded-lg border border-border bg-card px-3 text-sm text-text"
+              className="min-h-11 rounded-lg border border-input bg-card px-3 text-sm text-text"
             >
               <option value="">All profiles</option>
               {accounts.map((value) => (
@@ -182,7 +182,7 @@ export function Library() {
           <select
             value={rating}
             onChange={(event) => setRating(event.target.value)}
-            className="min-h-11 rounded-lg border border-border bg-card px-3 text-sm text-text"
+            className="min-h-11 rounded-lg border border-input bg-card px-3 text-sm text-text"
           >
             <option value="all">All ratings</option>
             <option value="good">Liked</option>
@@ -208,7 +208,7 @@ export function Library() {
       {error && (
         <p
           role="alert"
-          className="rounded-xl border border-red-800/50 bg-red-950/30 p-4 text-sm text-red-200"
+          className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-200"
         >
           {error}
         </p>
@@ -255,7 +255,7 @@ export function Library() {
           ) : (
             <Link
               href="/"
-              className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm text-violet-300"
+              className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm text-accent-text"
             >
               Open the prompt studio <ArrowUpRight size={16} aria-hidden />
             </Link>
@@ -280,10 +280,10 @@ export function Library() {
                   )}
                   <Badge>{prompt.iteration.session.platform}</Badge>
                   {prompt.rating === 1 && (
-                    <span className="text-xs text-emerald-400">Liked</span>
+                    <span className="text-xs text-emerald-700 dark:text-emerald-400">Liked</span>
                   )}
                   {prompt.rating === -1 && (
-                    <span className="text-xs text-red-400">Disliked</span>
+                    <span className="text-xs text-red-700 dark:text-red-400">Disliked</span>
                   )}
                   <span className="text-xs text-text-muted">
                     {prompt.storage === "browser"
@@ -339,7 +339,7 @@ export function Library() {
                 </div>
               </div>
               {prompt.iteration.refinement && (
-                <p className="mb-3 text-xs text-violet-300">
+                <p className="mb-3 text-xs text-accent-text">
                   Refinement: {prompt.iteration.refinement}
                 </p>
               )}
@@ -353,7 +353,7 @@ export function Library() {
                 <Link
                   href={`/?${new URLSearchParams({ brief: prompt.iteration.session.brief, base: prompt.output }).toString()}`}
                   title="Use as base for a new prompt"
-                  className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-violet-300"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-accent-text"
                 >
                   Remix this prompt <ArrowUpRight size={16} aria-hidden />
                 </Link>

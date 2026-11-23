@@ -8,7 +8,7 @@ export default async function Home({
   return (
     <main id="main" className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
       <header className="mb-10 max-w-3xl">
-        <p className="mb-4 text-xs uppercase tracking-[.22em] text-violet-300">
+        <p className="mb-4 text-xs uppercase tracking-[.22em] text-accent-text">
           A little more intention, before the image
         </p>
         <h1 className="text-4xl font-semibold leading-[1.08] tracking-tight sm:text-6xl">

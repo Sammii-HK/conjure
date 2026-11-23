@@ -12,13 +12,13 @@ function Badge({ className, variant = "default", ...props }: BadgeProps) {
         "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
         {
           "bg-border text-text-muted": variant === "default",
-          "bg-emerald-900/50 text-emerald-400 border border-emerald-800/50":
+          "bg-emerald-50 text-emerald-800 border border-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-400 dark:border-emerald-800/50":
             variant === "safe",
-          "bg-violet-900/50 text-violet-300 border border-violet-700/50":
+          "bg-violet-900/50 text-accent-text border border-violet-700/50":
             variant === "creative",
-          "bg-orange-900/50 text-orange-400 border border-orange-800/50":
+          "bg-orange-50 text-orange-800 border border-orange-300 dark:bg-orange-900/50 dark:text-orange-400 dark:border-orange-800/50":
             variant === "experimental",
-          "bg-indigo-900/50 text-indigo-300 border border-indigo-700/50":
+          "bg-indigo-50 text-indigo-800 border border-indigo-300 dark:bg-indigo-900/50 dark:text-indigo-300 dark:border-indigo-700/50":
             variant === "account",
         },
         className

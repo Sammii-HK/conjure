@@ -3,7 +3,7 @@ export default function LibraryPage() {
   return (
     <main id="main" className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
       <header className="mb-8">
-        <p className="text-xs uppercase tracking-[.22em] text-violet-300">
+        <p className="text-xs uppercase tracking-[.22em] text-accent-text">
           Your prompt library
         </p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">
